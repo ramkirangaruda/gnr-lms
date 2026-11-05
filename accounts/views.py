@@ -30,7 +30,7 @@ def user_list(request):
     stype = request.GET.get("type", "")
     if role:
         qs = qs.filter(role=role)
-    if school:
+    if school.isdigit():
         qs = qs.filter(school_id=school)
     if stype:
         qs = qs.filter(student_type=stype)
@@ -55,6 +55,8 @@ def user_create(request):
             u.role, u.school, u.student_type = User.Role.STUDENT, request.user.school, User.StudentType.SCHOOL
         if u.role == User.Role.STUDENT and not u.student_type:
             u.student_type = User.StudentType.SCHOOL if u.school else User.StudentType.IN_HOUSE
+        if u.student_type == User.StudentType.IN_HOUSE:
+            u.school = None
         if not u.username:
             prefix = username_prefix(u.student_type, u.school) if u.role == User.Role.STUDENT else u.role[:4] + "_"
             u.username = f"{prefix}{_next_seq(prefix):04d}"

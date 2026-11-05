@@ -20,7 +20,7 @@ def random_password(length=8):
 
 def username_prefix(student_type, school=None):
     yy = timezone.localdate().strftime("%y")
-    code = (school.code if school else "gnr").lower()
+    code = (school.code if school and student_type == User.StudentType.SCHOOL else "gnr").lower()
     code = re.sub(r"[^a-z0-9]", "", code) or "gnr"
     return f"{code}{yy}"
 

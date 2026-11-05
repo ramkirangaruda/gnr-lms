@@ -169,7 +169,10 @@ def doubt_detail(request, pk):
                 d.me_too.add(u)
             return redirect("doubt_detail", pk=pk)
         elif action == "accept" and can_moderate:
-            reply = get_object_or_404(DoubtReply, pk=request.POST.get("reply"), doubt=d)
+            reply_id = request.POST.get("reply", "")
+            if not reply_id.isdigit():
+                return redirect("doubt_detail", pk=pk)
+            reply = get_object_or_404(DoubtReply, pk=reply_id, doubt=d)
             d.replies.update(is_accepted=False)
             reply.is_accepted = True
             reply.save(update_fields=["is_accepted"])

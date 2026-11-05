@@ -68,6 +68,21 @@ class LMSFlowTests(TestCase):
         self.assertEqual(User.objects.filter(batch="Sat-AM", student_type="in_house").count(), 25)
         self.assertEqual(len({u.username for u, _ in r.context["created"]}), 25)
 
+    def test_in_house_ignores_selected_school(self):
+        self.login("instructor1", "instructor123")
+        r = self.client.post("/users/generate/", {"student_type": "in_house", "school": self.school.pk, "count": 1})
+        u = r.context["created"][0][0]
+        self.assertTrue(u.username.startswith("gnr"), u.username)
+        self.assertIsNone(u.school)
+
+    def test_malformed_ids_do_not_crash(self):
+        self.login("owner", "owner123")
+        for url in ["/users/?school=abc", "/students/?school=abc", "/certificates/issue/?course=abc",
+                    f"/courses/{self.course.slug}/quizzes/{self.quiz.pk}/manage/?edit=abc"]:
+            self.assertEqual(self.client.get(url).status_code, 200, url)
+        r = self.client.post(f"/courses/{self.course.slug}/students/", {"remove": "abc"})
+        self.assertEqual(r.status_code, 302)
+
     def test_student_learning_flow(self):
         self.login(self.student.username, "student123")
         c = self.course

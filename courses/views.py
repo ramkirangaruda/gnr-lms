@@ -226,13 +226,14 @@ def quiz_manage(request, slug, pk):
     course = _get_course_for_edit(request, slug)
     quiz = get_object_or_404(Quiz, pk=pk, course=course)
     edit_q = None
-    if request.GET.get("edit"):
+    if request.GET.get("edit", "").isdigit():
         edit_q = get_object_or_404(Question, pk=request.GET["edit"], quiz=quiz)
     form = QuestionForm(request.POST or None, request.FILES or None, instance=edit_q,
                         initial=None if edit_q else {"order": quiz.questions.count() + 1})
     if request.method == "POST":
         if "delete_question" in request.POST:
-            Question.objects.filter(pk=request.POST["delete_question"], quiz=quiz).delete()
+            if request.POST["delete_question"].isdigit():
+                Question.objects.filter(pk=request.POST["delete_question"], quiz=quiz).delete()
             messages.success(request, "Question removed.")
             return redirect("quiz_manage", slug=slug, pk=pk)
         if "delete_quiz" in request.POST:
@@ -308,7 +309,8 @@ def course_students(request, slug):
     form = EnrollForm(request.POST or None)
     if request.method == "POST":
         if "remove" in request.POST:
-            Enrollment.objects.filter(course=course, student_id=request.POST["remove"]).delete()
+            if request.POST["remove"].isdigit():
+                Enrollment.objects.filter(course=course, student_id=request.POST["remove"]).delete()
             messages.success(request, "Student removed from course.")
             return redirect("course_students", slug=slug)
         if form.is_valid():
@@ -397,7 +399,7 @@ def students_overview(request):
     q = request.GET.get("q", "").strip()
     if q:
         qs = qs.filter(Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(batch__icontains=q))
-    if request.GET.get("school"):
+    if request.GET.get("school", "").isdigit():
         qs = qs.filter(school_id=request.GET["school"])
     from accounts.models import School
     return render(request, "courses/students_overview.html", {
@@ -424,7 +426,7 @@ def certificate_list(request):
 @staff_required
 def certificate_issue(request):
     initial = {}
-    if request.GET.get("course"):
+    if request.GET.get("course", "").isdigit():
         c = Course.objects.filter(pk=request.GET["course"]).first()
         if c:
             initial["course"] = c
