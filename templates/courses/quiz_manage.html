@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% block title %}Manage quiz{% endblock %}
+{% block content %}
+<a class="small" href="{{ course.get_absolute_url }}">← {{ course.title }}</a>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3"><h3 class="mb-0">{{ quiz.title }} {% if not quiz.is_published %}<span class="badge text-bg-warning fs-6">Draft</span>{% endif %}</h3>
+ <div class="d-flex gap-2"><a class="btn btn-outline-secondary btn-sm" href="{% url 'quiz_edit' course.slug quiz.pk %}">Quiz settings</a><a class="btn btn-outline-primary btn-sm" href="{% url 'quiz_take' course.slug quiz.pk %}">Preview</a>
+ <form method="post">{% csrf_token %}<button name="delete_quiz" value="1" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this quiz and all attempts?')">Delete quiz</button></form></div></div>
+<div class="row g-4">
+ <div class="col-lg-7">
+  <h5>Questions ({{ questions|length }})</h5>
+  {% for q in questions %}<div class="card p-3 mb-2 quiz-q"><div class="d-flex justify-content-between"><div><b>Q{{ forloop.counter }}.</b> {{ q.text|linebreaksbr }} <span class="badge text-bg-light">{{ q.marks }} mark{{ q.marks|pluralize }}</span></div>
+   <div class="text-nowrap"><a class="btn btn-sm btn-light" href="?edit={{ q.pk }}#qform"><i class="bi bi-pencil"></i></a>
+   <form method="post" class="d-inline">{% csrf_token %}<button name="delete_question" value="{{ q.pk }}" class="btn btn-sm btn-light text-danger" onclick="return confirm('Remove question?')"><i class="bi bi-trash"></i></button></form></div></div>
+   {% if q.image %}<img src="{{ q.image.url }}" class="img-fluid rounded my-2" style="max-height:160px" alt="">{% endif %}
+   <ul class="small mb-0 mt-1">{% for c in q.choices.all %}<li class="{% if c.is_correct %}text-success fw-bold{% endif %}">{{ c.text }}{% if c.is_correct %} ✓{% endif %}</li>{% endfor %}</ul></div>
+  {% empty %}<div class="card p-4 text-muted">No questions yet – add the first one using the form.</div>{% endfor %}
+  <h5 class="mt-4">Recent attempts</h5>
+  <div class="card"><table class="table table-sm mb-0"><thead><tr><th>Student</th><th>Score</th><th>When</th></tr></thead><tbody>
+  {% for a in attempts %}<tr><td><a href="{% url 'student_report' a.student_id %}">{{ a.student }}</a></td><td class="{% if a.passed %}text-success{% else %}text-danger{% endif %}"><a href="{% url 'quiz_result' course.slug quiz.pk a.pk %}">{{ a.score }}/{{ a.total }} ({{ a.percent }}%)</a></td><td class="small">{{ a.submitted_at|date:"d M H:i" }}</td></tr>
+  {% empty %}<tr><td colspan="3" class="text-muted">No attempts yet.</td></tr>{% endfor %}</tbody></table></div>
+ </div>
+ <div class="col-lg-5"><div class="card p-4 sticky-top" style="top:80px" id="qform">
+  <h5>{% if edit_q %}Edit question{% else %}Add question{% endif %}</h5>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+   {% for e in form.non_field_errors %}<div class="alert alert-danger py-1">{{ e }}</div>{% endfor %}
+   {% include "_field.html" with field=form.text %}
+   <label class="form-label fw-semibold">Options <span class="small text-muted fw-normal">(tick the correct answer)</span></label>
+   {% for e in form.correct.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+   {% for cb in form.correct %}{% with fname="choice_"|add:cb.data.value %}<div class="input-group mb-2"><span class="input-group-text"><input type="checkbox" class="form-check-input mt-0" name="correct" value="{{ cb.data.value }}" {% if cb.data.selected %}checked{% endif %}></span>
+    {% for f in form %}{% if f.name == fname %}{{ f }}{% endif %}{% endfor %}</div>{% endwith %}{% endfor %}
+   <div class="row"><div class="col">{% include "_field.html" with field=form.marks %}</div><div class="col">{% include "_field.html" with field=form.order %}</div></div>
+   {% include "_field.html" with field=form.image %}
+   <button class="btn btn-primary">{% if edit_q %}Update{% else %}Add{% endif %} question</button>{% if edit_q %} <a class="btn btn-link" href="?">Cancel</a>{% endif %}
+  </form></div></div>
+</div>
+{% endblock %}

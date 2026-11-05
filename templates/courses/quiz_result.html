@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Quiz result{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-8">
+ <a class="small" href="{{ course.get_absolute_url }}">← {{ course.title }}</a>
+ <div class="card p-4 my-3 text-center">
+  <i class="bi {% if attempt.passed %}bi-trophy-fill text-warning{% else %}bi-emoji-neutral text-secondary{% endif %} display-3"></i>
+  <h3 class="mt-2">{% if attempt.passed %}Great job{% if attempt.student == user %}!{% else %}, {{ attempt.student }} passed{% endif %}{% else %}Keep practising{% endif %}</h3>
+  <div class="display-5 fw-bold {% if attempt.passed %}text-success{% else %}text-danger{% endif %}">{{ attempt.percent }}%</div>
+  <div class="text-muted">{{ attempt.score }} / {{ attempt.total }} marks · pass mark {{ attempt.quiz.pass_percentage }}% · {{ attempt.submitted_at|date:"d M Y, H:i" }}</div>
+  {% if user.is_student %}<div class="mt-3"><a class="btn btn-primary" href="{% url 'quiz_take' course.slug attempt.quiz_id %}">Try again</a> <a class="btn btn-outline-primary" href="{% url 'doubt_create' course.slug %}">Ask a doubt</a></div>{% endif %}
+ </div>
+ {% for q in questions %}<div class="card p-3 mb-2 quiz-q"><p class="fw-semibold mb-2">{% if q.is_right %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %} {{ forloop.counter }}. {{ q.text|linebreaksbr }}</p>
+  {% for c in q.choices.all %}<div class="px-2 py-1 rounded mb-1 small {% if c.id in q.correct_ids %}choice-right{% elif c.id in q.picked %}choice-wrong{% endif %}">{% if c.id in q.picked %}<b>Your answer:</b> {% endif %}{{ c.text }}{% if c.id in q.correct_ids %} ✓{% endif %}</div>{% endfor %}</div>{% endfor %}
+</div></div>
+{% endblock %}

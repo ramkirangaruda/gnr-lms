@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}Logins{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3"><h3 class="mb-0">Logins</h3>
+ <div><a class="btn btn-primary" href="{% url 'user_create' %}"><i class="bi bi-person-plus"></i> Create login</a> <a class="btn btn-warning" href="{% url 'bulk_generate' %}"><i class="bi bi-magic"></i> Auto-generate</a></div></div>
+<form class="row g-2 mb-3">
+ <div class="col-md-3"><input class="form-control" name="q" placeholder="Search name, username, batch" value="{{ f.q }}"></div>
+ {% if user.is_owner %}<div class="col-md-2"><select class="form-select" name="role"><option value="">All roles</option>{% for v,l in roles %}<option value="{{v}}" {% if f.role == v %}selected{% endif %}>{{l}}</option>{% endfor %}</select></div>{% endif %}
+ <div class="col-md-2"><select class="form-select" name="type"><option value="">All student types</option>{% for v,l in types %}<option value="{{v}}" {% if f.type == v %}selected{% endif %}>{{l}}</option>{% endfor %}</select></div>
+ <div class="col-md-3"><select class="form-select" name="school"><option value="">All schools</option>{% for s in schools %}<option value="{{s.pk}}" {% if f.school == s.pk|stringformat:"s" %}selected{% endif %}>{{s}}</option>{% endfor %}</select></div>
+ <div class="col-md-2"><button class="btn btn-outline-primary w-100">Filter</button></div>
+</form>
+<div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+ <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Type</th><th>School</th><th>Grade / batch</th><th>Last login</th><th></th></tr></thead>
+ <tbody>{% for u in page %}<tr class="{% if not u.is_active %}text-muted{% endif %}">
+  <td class="font-monospace">{{ u.username }}</td><td>{{ u.get_full_name|default:"—" }}</td>
+  <td><span class="badge text-bg-{% if u.role == 'owner' %}danger{% elif u.role == 'instructor' %}primary{% elif u.role == 'school' %}info{% else %}secondary{% endif %}">{{ u.get_role_display }}</span></td>
+  <td class="small">{{ u.get_student_type_display }}</td><td class="small">{{ u.school|default:"" }}</td><td class="small">{{ u.grade }} {{ u.batch }}</td>
+  <td class="small">{{ u.last_login|date:"d M, H:i"|default:"never" }}</td>
+  <td class="text-end text-nowrap">{% if u.is_student %}<a class="btn btn-sm btn-light" href="{% url 'student_report' u.pk %}" title="Performance"><i class="bi bi-graph-up"></i></a>{% endif %}<a class="btn btn-sm btn-light" href="{% url 'user_edit' u.pk %}" title="Edit"><i class="bi bi-pencil"></i></a></td>
+ </tr>{% empty %}<tr><td colspan="8" class="text-center text-muted py-4">No logins found.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+<div class="mt-3">{% include "_pager.html" %}</div>
+{% endblock %}

@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block title %}Report – {{ course.title }}{% endblock %}
+{% block content %}<a class="small" href="{{ course.get_absolute_url }}">← {{ course.title }}</a><h3>Student progress – {{ course.title }}</h3>{% include "courses/_report_table.html" %}{% endblock %}

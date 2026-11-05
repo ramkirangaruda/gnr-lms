@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-7">
+ <div class="card p-4">
+  <h4 class="mb-1">{{ title }}</h4>{% if intro %}<p class="text-muted">{{ intro }}</p>{% endif %}
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}{% include "_form.html" %}
+   <button class="btn btn-primary">Save</button> <a href="javascript:history.back()" class="btn btn-link">Cancel</a></form>
+  {% if target %}
+  <hr><div class="d-flex gap-2 flex-wrap">
+   <form method="post" action="{% url 'user_reset_password' target.pk %}">{% csrf_token %}<button class="btn btn-outline-warning btn-sm" onclick="return confirm('Generate a new password for {{ target.username }}?')"><i class="bi bi-key"></i> Reset password</button></form>
+   {% if target.is_student %}<a class="btn btn-outline-primary btn-sm" href="{% url 'student_report' target.pk %}"><i class="bi bi-graph-up"></i> Performance report</a>{% endif %}
+   {% if user.is_owner and target != user %}<form method="post" action="{% url 'user_delete' target.pk %}">{% csrf_token %}<button class="btn btn-outline-danger btn-sm" onclick="return confirm('Permanently delete {{ target.username }} and all their progress?')"><i class="bi bi-trash"></i> Delete</button></form>{% endif %}
+  </div>{% endif %}
+ </div></div></div>
+{% endblock %}

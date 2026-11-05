@@ -1,0 +1,75 @@
+{% load static %}{% with p=request.path %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0b0c">
+<title>{% block title %}GNR Robotics{% endblock %} · GNR Robotics</title>
+<link rel="preload" href="{% static 'fonts/inter.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{% static 'fonts/space-grotesk.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+<link href="{% static 'vendor/icons/bootstrap-icons.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/gnr.css' %}" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e10600'/%3E%3Ctext x='16' y='22' font-size='16' font-family='Arial' font-weight='700' fill='white' text-anchor='middle'%3EG%3C/text%3E%3C/svg%3E">
+</head>
+<body class="d-flex flex-column min-vh-100">
+<nav class="navbar navbar-expand-lg navbar-dark gnr-nav sticky-top">
+ <div class="container-fluid px-lg-4">
+  <a class="navbar-brand" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'home' %}{% endif %}"><span class="brand-mark"><i class="bi bi-robot"></i></span><span>GNR <span class="brand-sub">Robotics</span></span></a>
+  <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-label="Menu"><span class="navbar-toggler-icon"></span></button>
+  <div class="collapse navbar-collapse" id="nav">
+   <ul class="navbar-nav me-auto ms-lg-3">
+    {% if user.is_authenticated %}
+     <li class="nav-item"><a class="nav-link {% if p == '/dashboard/' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a></li>
+     <li class="nav-item"><a class="nav-link {% if '/courses/' in p %}active{% endif %}" href="{% url 'course_list' %}">Courses</a></li>
+     <li class="nav-item"><a class="nav-link {% if '/doubts/' in p %}active{% endif %}" href="{% url 'doubt_list' %}">Doubts{% if nav_doubts %}<span class="nav-count">{{ nav_doubts }}</span>{% endif %}</a></li>
+     <li class="nav-item"><a class="nav-link {% if '/certificates/' in p %}active{% endif %}" href="{% url 'certificate_list' %}">Certificates</a></li>
+     {% if not user.is_student %}
+     <li class="nav-item dropdown"><a class="nav-link {% if '/users/' in p or '/students/' in p or '/schools/' in p %}active{% endif %}" href="#" data-bs-toggle="dropdown">People <i class="bi bi-chevron-down small"></i></a>
+      <ul class="dropdown-menu">
+       <li><a class="dropdown-item" href="{% url 'students_overview' %}"><i class="bi bi-graph-up-arrow"></i> Student performance</a></li>
+       <li><a class="dropdown-item" href="{% url 'user_list' %}"><i class="bi bi-people"></i> Logins</a></li>
+       <li><a class="dropdown-item" href="{% url 'bulk_generate' %}"><i class="bi bi-magic"></i> Auto-generate accounts</a></li>
+       {% if user.is_owner %}<li><a class="dropdown-item" href="{% url 'school_list' %}"><i class="bi bi-building"></i> Schools</a></li>{% endif %}
+      </ul></li>
+     {% endif %}
+    {% endif %}
+    <li class="nav-item dropdown"><a class="nav-link {% if '/newsletters/' in p or '/competitions/' in p or '/gallery/' in p %}active{% endif %}" href="#" data-bs-toggle="dropdown">Community <i class="bi bi-chevron-down small"></i></a>
+     <ul class="dropdown-menu">
+      <li><a class="dropdown-item" href="{% url 'competition_list' %}"><i class="bi bi-trophy"></i> Competitions</a></li>
+      <li><a class="dropdown-item" href="{% url 'newsletter_list' %}"><i class="bi bi-newspaper"></i> Newsletters</a></li>
+      <li><a class="dropdown-item" href="{% url 'gallery' %}"><i class="bi bi-images"></i> Gallery</a></li>
+     </ul></li>
+   </ul>
+   <ul class="navbar-nav align-items-lg-center gap-2">
+    {% if user.is_authenticated %}
+     {% if user.is_student %}<li class="nav-item d-none d-lg-block"><a class="btn btn-primary btn-sm btn-glow" href="{% url 'doubt_ask' %}"><i class="bi bi-chat-dots"></i> Ask a doubt</a></li>{% endif %}
+     <li class="nav-item dropdown"><a class="nav-link d-flex align-items-center gap-2" href="#" data-bs-toggle="dropdown"><span class="avatar">{{ user.first_name|default:user.username|first|upper }}</span><span class="d-lg-none d-xl-inline">{{ user }}</span> <span class="role-chip">{% if user.is_superuser %}Owner{% else %}{{ user.get_role_display }}{% endif %}</span></a>
+      <ul class="dropdown-menu dropdown-menu-end">
+       {% if user.is_student %}<li><a class="dropdown-item" href="{% url 'student_report' user.pk %}"><i class="bi bi-bar-chart"></i> My progress</a></li>{% endif %}
+       <li><a class="dropdown-item" href="{% url 'password_change' %}"><i class="bi bi-key"></i> Change password</a></li>
+       {% if user.is_owner %}<li><a class="dropdown-item" href="/admin/"><i class="bi bi-database"></i> Admin panel</a></li>{% endif %}
+       <li><hr class="dropdown-divider"></li>
+       <li><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="dropdown-item"><i class="bi bi-box-arrow-right"></i> Log out</button></form></li>
+      </ul></li>
+    {% else %}
+     <li class="nav-item"><a class="btn btn-primary btn-sm px-3 btn-glow" href="{% url 'login' %}">Log in</a></li>
+    {% endif %}
+   </ul>
+  </div>
+ </div>
+</nav>
+<main class="flex-grow-1 {% block main_class %}container py-4 py-lg-5{% endblock %}">
+ {% if messages %}<div class="{% block msg_class %}{% endblock %}">{% for m in messages %}<div class="alert alert-{% if m.tags == 'error' %}danger{% else %}{{ m.tags|default:'info' }}{% endif %} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}</div>{% endif %}
+ {% block content %}{% endblock %}
+</main>
+<footer class="gnr-footer py-4 mt-5">
+ <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3 small">
+  <div class="d-flex align-items-center gap-2"><span class="brand-mark" style="width:28px;height:28px;font-size:.9rem"><i class="bi bi-robot"></i></span><span class="text-white fw-semibold">GNR Robotics</span><span>· Learn. Build. Innovate.</span></div>
+  <div class="d-flex gap-3"><a href="{% url 'competition_list' %}">Competitions</a><a href="{% url 'newsletter_list' %}">Newsletters</a><a href="{% url 'gallery' %}">Gallery</a></div>
+ </div>
+</footer>
+<script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}" defer></script>
+<script type="module" src="{% static 'islands/islands.js' %}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>{% endwith %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% block title %}{{ course.title }}{% endblock %}
+{% block content %}
+<div class="page-banner mb-4 reveal"><div class="row g-4 align-items-center">
+ <div class="col-md-8">
+  <div class="small mb-2"><span class="badge text-bg-primary">{{ course.get_level_display }}</span> {% if course.age_group %}<span class="badge bg-light text-dark">{{ course.age_group }}</span>{% endif %} {% if not course.is_published %}<span class="badge text-bg-warning">Draft – hidden from students</span>{% endif %}</div>
+  <h1 class="fw-bold" style="font-size:clamp(1.8rem,3.5vw,2.6rem)">{{ course.title }}</h1><p class="text-muted mb-2">{{ course.description|linebreaksbr }}</p>
+  {% with ins=course.instructors.all %}{% if ins %}<div class="small"><i class="bi bi-person-badge"></i> Instructors: {{ ins|join:", " }}</div>{% endif %}{% endwith %}
+  {% if progress is not None %}<div class="mt-3" style="max-width:420px">{% include "_progress.html" with value=progress %}<div class="small mt-1 text-white-50"><b class="text-white">{{ progress }}%</b> complete</div></div>{% endif %}
+ </div>
+ <div class="col-md-4 text-md-end">
+  {% if lessons %}<a class="btn btn-primary btn-lg btn-glow mb-2" href="{% url 'lesson_detail' course.slug lessons.0.pk %}"><i class="bi bi-play-fill"></i> {% if progress %}Continue{% else %}Start{% endif %} learning</a><br>{% endif %}
+  {% if user.is_student %}<a class="btn btn-ghost-light" href="{% url 'doubt_ask' %}?course={{ course.pk }}"><i class="bi bi-question-circle"></i> Ask a doubt</a>{% endif %}
+  {% if certificate %}<a class="btn btn-success mt-2" href="{% url 'certificate_view' certificate.code %}"><i class="bi bi-award"></i> View certificate</a>{% endif %}
+ </div></div>
+ </div>{% if can_manage %}<div class="card p-3 mb-4 d-flex flex-row flex-wrap gap-2">
+  <a class="btn btn-sm btn-primary" href="{% url 'lesson_create' course.slug %}"><i class="bi bi-plus"></i> Add lesson</a>
+  <a class="btn btn-sm btn-primary" href="{% url 'quiz_create' course.slug %}"><i class="bi bi-ui-checks"></i> Add quiz</a>
+  <a class="btn btn-sm btn-outline-primary" href="{% url 'course_students' course.slug %}"><i class="bi bi-people"></i> Students & enrolment</a>
+  <a class="btn btn-sm btn-outline-primary" href="{% url 'certificate_issue' %}?course={{ course.pk }}&completed=1"><i class="bi bi-award"></i> Certify completers</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'course_edit' course.slug %}"><i class="bi bi-pencil"></i> Edit</a>
+  <a class="btn btn-sm btn-light text-danger ms-auto" href="{% url 'course_delete' course.slug %}"><i class="bi bi-trash"></i> Delete course</a>
+ </div>{% elif not user.is_student %}<div class="mb-4"><a class="btn btn-sm btn-outline-primary" href="{% url 'course_report' course.slug %}"><i class="bi bi-graph-up"></i> Student progress</a></div>{% endif %}
+<div class="row g-4">
+ <div class="col-lg-7"><h5 class="section-title">Lessons</h5><div class="list-group">
+  {% for l in lessons %}<a href="{% url 'lesson_detail' course.slug l.pk %}" class="list-group-item list-group-item-action lesson-row py-3 {% if l.done %}done{% endif %}">
+   <span class="lesson-num">{% if l.done %}<i class="bi bi-check-lg"></i>{% else %}{{ forloop.counter }}{% endif %}</span>
+   <span class="flex-grow-1 fw-semibold">{{ l.title }}<span class="d-block small text-muted fw-normal"><i class="bi {% if l.video_url or l.video_file %}bi-play-circle{% else %}bi-file-text{% endif %}"></i> {% if l.video_url or l.video_file %}Video lesson{% else %}Reading{% endif %}</span></span>
+   {% if l.duration_minutes %}<span class="small text-muted">{{ l.duration_minutes }} min</span>{% endif %}</a>
+  {% empty %}<div class="list-group-item text-muted">No lessons yet.</div>{% endfor %}</div></div>
+ <div class="col-lg-5"><h5 class="section-title">Quizzes</h5><div class="list-group">
+  {% for q in quizzes %}<div class="list-group-item d-flex align-items-center gap-2">
+   <span class="lesson-num" style="background:var(--red-50);color:var(--red)"><i class="bi bi-ui-checks"></i></span><div class="flex-grow-1">{{ q.title }} {% if not q.is_published %}<span class="badge text-bg-warning">Draft</span>{% endif %}<div class="small text-muted">{{ q.n_q }} questions · pass {{ q.pass_percentage }}%{% if q.time_limit_minutes %} · {{ q.time_limit_minutes }} min{% endif %}</div>
+   {% if q.best %}<div class="small">Best: <b class="{% if q.best.passed %}text-success{% else %}text-danger{% endif %}">{{ q.best.percent }}%</b></div>{% endif %}</div>
+   {% if can_manage %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'quiz_manage' course.slug q.pk %}">Manage</a>{% endif %}
+   {% if q.n_q %}<a class="btn btn-sm btn-primary" href="{% url 'quiz_take' course.slug q.pk %}">{% if user.is_student %}{% if q.best %}Retake{% else %}Start{% endif %}{% else %}Preview{% endif %}</a>{% endif %}
+  </div>{% empty %}<div class="list-group-item text-muted">No quizzes yet.</div>{% endfor %}</div></div>
+</div>
+{% endblock %}

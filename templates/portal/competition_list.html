@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}Competitions{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3"><h3>Competitions</h3>{% if user.is_staff_member %}<a class="btn btn-primary" href="{% url 'competition_create' %}"><i class="bi bi-plus"></i> New competition</a>{% endif %}</div>
+<h5>Upcoming</h5><div class="row g-3 mb-4">{% for c in upcoming %}{% include "portal/_comp_card.html" %}{% empty %}<div class="col-12 text-muted">No upcoming competitions – check back soon!</div>{% endfor %}</div>
+{% if past %}<h5>Past competitions & results</h5><div class="row g-3">{% for c in past %}{% include "portal/_comp_card.html" %}{% endfor %}</div>{% endif %}
+{% endblock %}

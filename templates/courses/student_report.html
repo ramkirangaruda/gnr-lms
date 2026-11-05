@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}{{ student }} – performance{% endblock %}
+{% block content %}
+<div class="card p-4 mb-4"><div class="d-flex justify-content-between flex-wrap gap-2"><div>
+ <h3 class="mb-0">{{ student.get_full_name|default:student.username }}</h3>
+ <div class="text-muted small"><span class="font-monospace">{{ student.username }}</span> · {{ student.get_student_type_display }} · {{ student.school|default:"GNR centre" }}{% if student.grade %} · Grade {{ student.grade }}{% endif %}{% if student.batch %} · Batch {{ student.batch }}{% endif %}</div>
+ <div class="small text-muted">Last login: {{ student.last_login|date:"d M Y, H:i"|default:"never" }}</div></div>
+ <div class="no-print"><button class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print report</button>
+ {% if not user.is_student %}<a class="btn btn-outline-primary btn-sm" href="{% url 'user_edit' student.pk %}">Edit login</a>{% endif %}</div></div></div>
+<h5>Courses</h5>
+<div class="row g-3 mb-4">{% for s in stats %}<div class="col-md-6 col-xl-4"><div class="card p-3 h-100">
+ <h6><a href="{{ s.course.get_absolute_url }}">{{ s.course.title }}</a></h6>
+ {% include "_progress.html" with value=s.progress %}<div class="small mt-1">{{ s.lessons_done }}/{{ s.lessons_total }} lessons ({{ s.progress }}%)</div>
+ <div class="small">Quizzes taken: {{ s.quizzes_taken }}{% if s.quiz_avg is not None %} · best-score average <b>{{ s.quiz_avg }}%</b>{% endif %}</div>
+ {% for a in s.best_attempts %}<div class="small text-muted">• {{ a.quiz.title }}: <span class="{% if a.passed %}text-success{% else %}text-danger{% endif %}">{{ a.percent }}%</span></div>{% endfor %}
+</div></div>{% empty %}<div class="col-12 text-muted">Not enrolled in any course.</div>{% endfor %}</div>
+<div class="row g-4">
+ <div class="col-lg-6"><h5>Quiz history</h5><div class="card"><table class="table table-sm mb-0"><thead><tr><th>Quiz</th><th>Score</th><th>Date</th></tr></thead><tbody>
+ {% for a in attempts %}<tr><td><a href="{% url 'quiz_result' a.quiz.course.slug a.quiz_id a.pk %}">{{ a.quiz.title }}</a><div class="small text-muted">{{ a.quiz.course }}</div></td><td class="{% if a.passed %}text-success{% else %}text-danger{% endif %}">{{ a.score }}/{{ a.total }} ({{ a.percent }}%)</td><td class="small">{{ a.submitted_at|date:"d M Y" }}</td></tr>
+ {% empty %}<tr><td colspan="3" class="text-muted">No attempts yet.</td></tr>{% endfor %}</tbody></table></div></div>
+ <div class="col-lg-6"><h5>Certificates</h5><div class="list-group mb-4">{% for c in certificates %}<a class="list-group-item list-group-item-action" href="{% url 'certificate_view' c.code %}"><i class="bi bi-award text-warning"></i> {{ c.title }} <span class="small text-muted">– {{ c.course|default:c.achievement }} · {{ c.issued_on|date:"d M Y" }}</span></a>{% empty %}<div class="list-group-item text-muted">None yet.</div>{% endfor %}</div>
+ <h5>Doubts asked</h5><div class="list-group">{% for d in doubts %}<a class="list-group-item list-group-item-action small" href="{% url 'doubt_detail' d.pk %}">{{ d.title }} <span class="text-muted">– {{ d.course }}</span> {% if d.is_resolved %}<span class="badge text-bg-success">resolved</span>{% else %}<span class="badge text-bg-warning">open</span>{% endif %}</a>{% empty %}<div class="list-group-item text-muted small">None.</div>{% endfor %}</div></div>
+</div>
+{% endblock %}

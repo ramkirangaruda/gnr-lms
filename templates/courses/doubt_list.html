@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% load gnr_text %}{% block title %}Doubts{% endblock %}
+{% block content %}
+<div class="page-banner mb-4 reveal">
+ <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+  <div><div class="eyebrow mb-1">Doubt clarification</div>
+   <h2 class="mb-1">{% if user.is_student %}Stuck? <span style="color:#ff5a4f">Ask away.</span>{% else %}Help students get unstuck{% endif %}</h2>
+   <p class="text-muted mb-0">{% if user.is_student %}Ask about any lesson, your code, circuit or kit. Browse the community tab to learn from classmates' answered doubts.{% else %}Doubts with the most “me too” votes are shown first in the queue.{% endif %}</p></div>
+  {% if user.is_student %}<a class="btn btn-primary btn-lg btn-glow" href="{% url 'doubt_ask' %}"><i class="bi bi-plus-lg"></i> Ask a doubt</a>{% endif %}
+ </div>
+</div>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+ <nav class="doubt-tabs">{% for k, label, n in tabs %}<a href="?tab={{ k }}" class="{% if tab == k %}active{% endif %}">{{ label }}<span class="cnt">{{ n }}</span></a>{% endfor %}</nav>
+ <form class="d-flex flex-wrap gap-2">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <input class="form-control form-control-sm" style="width:200px" name="q" value="{{ f.q }}" placeholder="Search doubts…">
+  <select name="course" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()"><option value="">All courses</option><option value="general" {% if f.course == 'general' %}selected{% endif %}>General</option>{% for c in courses %}<option value="{{ c.pk }}" {% if f.course == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.title|truncatechars:30 }}</option>{% endfor %}</select>
+  <select name="cat" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()"><option value="">All topics</option>{% for v, l in categories %}<option value="{{ v }}" {% if f.cat == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  {% if user.is_instructor %}<div class="form-check form-switch d-flex align-items-center gap-2 ms-1"><input class="form-check-input" type="checkbox" name="mine" value="1" id="mine" {% if f.mine %}checked{% endif %} onchange="this.form.submit()"><label class="form-check-label small" for="mine">My courses</label></div>{% endif %}
+ </form>
+</div>
+
+<div class="card overflow-hidden">
+ {% for d in page %}
+ <a class="doubt-item reveal" style="--i:{{ forloop.counter0 }}" href="{% url 'doubt_detail' d.pk %}">
+  <span class="status-dot status-{{ d.status }}" title="{{ d.get_status_display }}"></span>
+  <div class="flex-grow-1 min-w-0">
+   <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><span class="doubt-title">{{ d.title }}</span>{% if d.is_private %}<i class="bi bi-lock-fill text-muted small" title="Private"></i>{% endif %}</div>
+   <div class="text-muted small mb-2 text-truncate">{{ d.body|plain|truncatechars:140 }}</div>
+   <div class="d-flex flex-wrap gap-2 align-items-center">
+    <span class="meta-chip"><i class="bi {{ d.category_icon }}"></i>{{ d.get_category_display }}</span>
+    <span class="meta-chip"><i class="bi bi-journal-code"></i>{{ d.course|default:"General" }}{% if d.lesson %} › {{ d.lesson.title|truncatechars:24 }}{% endif %}</span>
+    <span class="small text-muted">{% if not user.is_student or d.student != user %}{{ d.student.first_name|default:d.student.username }} · {% endif %}{{ d.created_at|timesince }} ago</span>
+   </div>
+  </div>
+  <div class="text-end d-flex flex-column align-items-end gap-2 flex-shrink-0">
+   <span class="status-badge {{ d.status }}">{{ d.get_status_display }}</span>
+   <div class="small text-muted text-nowrap">{% if d.n_metoo %}<i class="bi bi-people-fill" style="color:var(--red)"></i> {{ d.n_metoo }} · {% endif %}<i class="bi bi-chat"></i> {{ d.n_replies }}</div>
+  </div>
+ </a>
+ {% empty %}
+ <div class="text-center py-5 px-3">
+  <div class="stat-icon mx-auto mb-3" style="width:64px;height:64px;border-radius:18px;display:grid;place-items:center;background:var(--red-50);color:var(--red);font-size:1.8rem"><i class="bi bi-chat-square-heart"></i></div>
+  {% if tab == 'queue' %}<h5>All caught up!</h5><p class="text-muted">No doubts are waiting for an answer.</p>
+  {% elif user.is_student and tab == 'mine' %}<h5>No doubts yet</h5><p class="text-muted">When something doesn't work, ask here. There are no silly questions.</p><a class="btn btn-primary" href="{% url 'doubt_ask' %}">Ask your first doubt</a>
+  {% else %}<h5>Nothing here yet</h5><p class="text-muted mb-0">Try another tab or filter.</p>{% endif %}
+ </div>
+ {% endfor %}
+</div>
+<div class="mt-3">{% include "_pager.html" %}</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}{% block title %}Ask a doubt{% endblock %}
+{% block content %}
+<a class="small fw-semibold" href="{% url 'doubt_list' %}"><i class="bi bi-arrow-left"></i> All doubts</a>
+<div class="row g-4 mt-1">
+ <div class="col-lg-8">
+  <div class="card p-4 p-lg-5 reveal">
+   <div class="eyebrow mb-1">New doubt</div><h2 class="mb-4">What are you stuck on?</h2>
+   <form method="post" enctype="multipart/form-data" id="askform">{% csrf_token %}
+    {% for e in form.non_field_errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+    <div class="row g-3 mb-1">
+     <div class="col-md-6">{% include "_field.html" with field=form.course %}</div>
+     <div class="col-md-6"><div class="mb-3"><label class="form-label fw-semibold" for="id_lesson">Lesson (optional)</label>
+      <select name="lesson" id="id_lesson" class="form-select"><option value="">— Any / not sure —</option>{% for l in lessons %}<option value="{{ l.pk }}" data-course="{{ l.course_id }}" {% if form.lesson.value|stringformat:"s" == l.pk|stringformat:"s" %}selected{% endif %}>{{ l.title }}</option>{% endfor %}</select>
+      {% for e in form.lesson.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div></div>
+    </div>
+    <label class="form-label fw-semibold">Topic</label>
+    <div class="cat-grid mb-4">{% for v, label, icon in categories %}<div class="cat-option"><input type="radio" name="category" id="cat-{{ v }}" value="{{ v }}" {% if form.category.value == v %}checked{% endif %}><label for="cat-{{ v }}"><i class="bi {{ icon }}"></i>{{ label }}</label></div>{% endfor %}</div>
+    {% include "_field.html" with field=form.title %}
+    <div id="similar" class="similar-box mb-3 d-none"><div class="small fw-semibold mb-1"><i class="bi bi-lightbulb" style="color:var(--red)"></i> These answered doubts might help:</div><ul class="small mb-0 ps-3" id="similar-list"></ul></div>
+    {% include "_field.html" with field=form.body %}
+    <div class="mb-3"><label class="form-label fw-semibold">Photo (optional)</label>
+     <label class="dropzone d-block" id="dz"><i class="bi bi-camera fs-3 d-block mb-1" style="color:var(--red)"></i><span id="dz-text">Add a photo of your circuit, robot or screen</span><input type="file" name="image" accept="image/*" class="d-none" id="id_image"></label>
+     {% for e in form.image.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+    {% include "_field.html" with field=form.is_private %}
+    <button class="btn btn-primary btn-lg btn-glow px-4"><i class="bi bi-send"></i> Post doubt</button>
+   </form>
+  </div>
+ </div>
+ <div class="col-lg-4">
+  <div class="card card-dark p-4 reveal" style="--i:1" data-rb="spotlight">
+   <h5 class="mb-3"><i class="bi bi-stars" style="color:#ff5a4f"></i> Get a faster answer</h5>
+   <ul class="list-unstyled tip-list small mb-0">
+    <li><i class="bi bi-check2-circle"></i> Say what you <b>expected</b> and what <b>actually happened</b>.</li>
+    <li><i class="bi bi-check2-circle"></i> Paste your code or the exact error message.</li>
+    <li><i class="bi bi-check2-circle"></i> A clear photo of the wiring helps a lot with circuit doubts.</li>
+    <li><i class="bi bi-check2-circle"></i> Mention which sensor, motor or board you're using.</li>
+    <li><i class="bi bi-check2-circle"></i> Check the suggestions below the title. Someone may have asked already!</li>
+   </ul>
+  </div>
+ </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  var course=document.getElementById('id_course'), lesson=document.getElementById('id_lesson');
+  function filterLessons(){var c=course.value;[].forEach.call(lesson.options,function(o){if(!o.value)return;var ok=o.dataset.course===c;o.hidden=!ok;o.disabled=!ok;if(!ok&&o.selected)lesson.value='';});lesson.disabled=!c;}
+  course.addEventListener('change',filterLessons);filterLessons();
+  var img=document.getElementById('id_image'),dz=document.getElementById('dz'),txt=document.getElementById('dz-text');
+  img.addEventListener('change',function(){if(img.files[0])txt.textContent='📎 '+img.files[0].name;});
+  ['dragover','dragenter'].forEach(function(e){dz.addEventListener(e,function(ev){ev.preventDefault();dz.classList.add('drag')})});
+  ['dragleave','drop'].forEach(function(e){dz.addEventListener(e,function(){dz.classList.remove('drag')})});
+  dz.addEventListener('drop',function(ev){ev.preventDefault();img.files=ev.dataTransfer.files;img.dispatchEvent(new Event('change'));});
+  var title=document.getElementById('id_title'),box=document.getElementById('similar'),list=document.getElementById('similar-list'),t;
+  title.addEventListener('input',function(){clearTimeout(t);t=setTimeout(function(){
+    if(title.value.length<8){box.classList.add('d-none');return;}
+    fetch('{% url "doubt_similar" %}?q='+encodeURIComponent(title.value)).then(function(r){return r.json()}).then(function(d){
+      list.innerHTML='';d.results.forEach(function(r){var li=document.createElement('li'),a=document.createElement('a');a.href='/doubts/'+r.pk+'/';a.target='_blank';a.textContent=r.title;li.appendChild(a);list.appendChild(li);});
+      box.classList.toggle('d-none',!d.results.length);});},350);});
+})();
+</script>{% endblock %}

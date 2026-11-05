@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}Courses{% endblock %}
+{% block content %}
+<div class="page-head">
+ <div><div class="eyebrow">Learn</div><h2>{% if user.is_student %}My courses{% else %}Courses{% endif %}</h2></div>
+ <div class="d-flex gap-2"><form><input class="form-control" name="q" value="{{ q }}" placeholder="Search courses"></form>
+ {% if user.is_staff_member %}<a class="btn btn-primary text-nowrap" href="{% url 'course_create' %}"><i class="bi bi-plus-lg"></i> New course</a>{% endif %}</div>
+</div>
+<div class="row g-3">
+{% for c in courses %}
+ <div class="col-sm-6 col-lg-4 col-xl-3 reveal" style="--i:{{ forloop.counter0 }}"><div class="card card-hover course-card" data-rb="spotlight">
+  <a href="{{ c.get_absolute_url }}" class="thumb-wrap d-block">{% if c.thumbnail %}<img src="{{ c.thumbnail.url }}" class="course-thumb" alt="" loading="lazy">{% else %}<div class="thumb-placeholder"><i class="bi bi-cpu"></i></div>{% endif %}</a>
+  <div class="card-body d-flex flex-column">
+   <div class="small mb-1"><span class="badge text-bg-light">{{ c.get_level_display }}</span> {% if c.age_group %}<span class="badge text-bg-light">{{ c.age_group }}</span>{% endif %} {% if not c.is_published %}<span class="badge text-bg-warning">Draft</span>{% endif %}</div>
+   <h6 class="card-title"><a class="text-decoration-none text-dark" href="{{ c.get_absolute_url }}">{{ c.title }}</a></h6>
+   <p class="small text-muted flex-grow-1">{{ c.description|truncatewords:18 }}</p>
+   <div class="small text-muted mb-2"><i class="bi bi-play-circle"></i> {{ c.n_lessons }} lessons {% if not user.is_student %}· <i class="bi bi-people"></i> {{ c.n_students }} students{% endif %}</div>
+   {% if c.my_progress is not None %}{% include "_progress.html" with value=c.my_progress %}<div class="small text-muted mt-1">{{ c.my_progress }}% complete</div>{% endif %}
+  </div></div></div>
+{% empty %}<div class="col-12"><div class="card p-5 text-center text-muted">{% if user.is_student %}You are not enrolled in any course yet. Your instructor will add you soon.{% else %}No courses yet.{% endif %}</div></div>
+{% endfor %}
+</div>
+{% endblock %}

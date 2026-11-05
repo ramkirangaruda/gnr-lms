@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}{{ n.title }}{% endblock %}
+{% block content %}<div class="row justify-content-center"><div class="col-lg-8"><a class="small" href="{% url 'newsletter_list' %}">← Newsletters</a>
+<div class="card p-4 mt-2">{% if n.cover %}<img src="{{ n.cover.url }}" class="img-fluid rounded mb-3" alt="">{% endif %}
+<div class="small text-muted">{{ n.published_on|date:"d F Y" }}</div><h2>{{ n.title }}</h2>{% if n.summary %}<p class="lead">{{ n.summary }}</p>{% endif %}<div>{{ n.body|linebreaks }}</div>
+{% if n.pdf %}<a class="btn btn-outline-primary" href="{{ n.pdf.url }}" target="_blank"><i class="bi bi-file-pdf"></i> Read the PDF edition</a>{% endif %}
+{% if user.is_staff_member %}<hr><a class="btn btn-sm btn-outline-secondary" href="{% url 'newsletter_edit' n.pk %}">Edit / delete</a>{% endif %}</div></div></div>{% endblock %}

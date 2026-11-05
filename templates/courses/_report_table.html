@@ -1,0 +1,10 @@
+<form class="d-flex gap-2 mb-2"><input class="form-control" name="q" value="{{ q }}" placeholder="Search student, batch, school"><button class="btn btn-outline-primary">Search</button></form>
+<div class="card"><div class="table-responsive"><table class="table table-sm align-middle mb-0">
+<thead><tr><th>Student</th><th>School</th><th>Grade</th><th style="width:22%">Lessons ({{ n_lessons }})</th><th>Quiz avg</th><th>Completed</th>{% if removable %}<th></th>{% endif %}</tr></thead><tbody>
+{% for r in rows %}<tr><td><a href="{% url 'student_report' r.s.pk %}">{{ r.s }}</a><div class="small text-muted font-monospace">{{ r.s.username }}</div></td><td class="small">{{ r.s.school|default:"In-house" }}</td><td class="small">{{ r.s.grade }} {{ r.s.batch }}</td>
+<td>{% include "_progress.html" with value=r.progress %}<span class="small">{{ r.progress }}%</span></td>
+<td>{% if r.quiz_avg is not None %}<b class="{% if r.quiz_avg >= 50 %}text-success{% else %}text-danger{% endif %}">{{ r.quiz_avg }}%</b> <span class="small text-muted">({{ r.quizzes }})</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+<td class="small">{{ r.e.completed_at|date:"d M Y"|default:"—" }}</td>
+{% if removable %}<td><form method="post">{% csrf_token %}<button name="remove" value="{{ r.s.pk }}" class="btn btn-sm btn-light text-danger" onclick="return confirm('Remove from course?')" title="Remove"><i class="bi bi-x-lg"></i></button></form></td>{% endif %}</tr>
+{% empty %}<tr><td colspan="7" class="text-center text-muted py-4">No students enrolled.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="mt-2">{% include "_pager.html" %}</div>

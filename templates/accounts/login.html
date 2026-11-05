@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% block title %}Log in{% endblock %}{% block main_class %}{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+ <div class="auth-side hero-dark d-flex align-items-end">
+  <div class="rb-bg" data-rb="threads"></div>
+  <div class="hero-inner p-4 p-lg-5">
+   <div class="pill mb-3"><span class="dot"></span> GNR Robotics LMS</div>
+   <h1 class="hero-title mb-3" style="font-size:clamp(2rem,4vw,3.4rem)">Every great robot<br>starts with <span class="accent">one line of code.</span></h1>
+   <p class="lead mb-0 d-none d-lg-block">Students, instructors, schools and the GNR team: log in with the username you were given.</p>
+  </div>
+ </div>
+ <div class="auth-form">
+  <div class="inner reveal">
+   <div class="eyebrow mb-2">Welcome back</div>
+   <h2 class="mb-4">Log in to your account</h2>
+   <form method="post">{% csrf_token %}
+    {% if form.errors %}<div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-circle"></i> Wrong username or password. Please try again.</div>{% endif %}
+    <div class="mb-3"><label class="form-label fw-semibold">Username</label><input name="username" class="form-control form-control-lg" autofocus autocapitalize="none" autocomplete="username" required value="{{ form.username.value|default:'' }}" placeholder="e.g. gnr260001"></div>
+    <div class="mb-4"><label class="form-label fw-semibold">Password</label>
+     <div class="input-group"><input type="password" name="password" id="pw" class="form-control form-control-lg" autocomplete="current-password" required><button type="button" class="btn btn-light border" onclick="pw.type=pw.type==='password'?'text':'password';this.firstChild.classList.toggle('bi-eye-slash')" aria-label="Show password"><i class="bi bi-eye"></i></button></div></div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="btn btn-primary btn-lg w-100 btn-glow">Log in <i class="bi bi-arrow-right"></i></button>
+   </form>
+   <p class="small text-muted mt-4 mb-0"><i class="bi bi-info-circle"></i> Forgot your password? Ask your instructor or school coordinator to reset it.</p>
+  </div>
+ </div>
+</div>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}Issue certificate{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-7"><div class="card p-4">
+ <h4><i class="bi bi-award"></i> Issue certificates</h4>
+ <p class="small text-muted">Issue to one or many students at once – course completion, competition winners, workshop participation, etc. Tip: from a course page, “Certify completers” pre-fills everyone who finished.</p>
+ <form method="post">{% csrf_token %}{% include "_form.html" %}<button class="btn btn-primary">Issue</button> <a class="btn btn-link" href="{% url 'certificate_list' %}">Cancel</a></form>
+</div></div></div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}{% load gnr_text %}{% block title %}{{ d.title }}{% endblock %}
+{% block content %}
+<a class="small fw-semibold" href="{% url 'doubt_list' %}"><i class="bi bi-arrow-left"></i> All doubts</a>
+<div class="row g-4 mt-1">
+ <div class="col-lg-8">
+  <div class="card p-4 p-lg-5 mb-4 reveal">
+   <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <span class="status-badge {{ d.status }}">{{ d.get_status_display }}</span>
+    <span class="meta-chip"><i class="bi {{ d.category_icon }}"></i>{{ d.get_category_display }}</span>
+    {% if d.course %}<a class="meta-chip text-decoration-none" href="{{ d.course.get_absolute_url }}"><i class="bi bi-journal-code"></i>{{ d.course }}</a>{% else %}<span class="meta-chip"><i class="bi bi-globe"></i>General</span>{% endif %}
+    {% if d.lesson %}<a class="meta-chip text-decoration-none" href="{% url 'lesson_detail' d.course.slug d.lesson.pk %}"><i class="bi bi-play-circle"></i>{{ d.lesson.title }}</a>{% endif %}
+    {% if d.is_private %}<span class="meta-chip"><i class="bi bi-lock-fill"></i>Private</span>{% endif %}
+   </div>
+   <h2 class="mb-3">{{ d.title }}</h2>
+   <div class="d-flex align-items-center gap-2 mb-4 small text-muted"><span class="avatar" style="width:28px;height:28px;font-size:.75rem;background:var(--ink)">{{ d.student|initial }}</span>
+    <span><b class="text-dark">{% if is_owner %}You{% else %}{{ d.student.first_name|default:d.student.username }}{% endif %}</b>{% if not user.is_student and d.student.school %} · {{ d.student.school }}{% endif %} · asked {{ d.created_at|timesince }} ago</span></div>
+   <div class="doubt-body">{{ d.body|rich }}</div>
+   {% if d.image %}<a href="{{ d.image.url }}" target="_blank"><img src="{{ d.image.url }}" class="img-fluid rounded-3 mt-2 border" style="max-height:380px" alt="Attached photo"></a>{% endif %}
+   <div class="d-flex flex-wrap gap-2 align-items-center mt-4 pt-3 border-top">
+    {% if user.is_student and not is_owner %}<form method="post">{% csrf_token %}<button name="action" value="metoo" class="metoo-btn {% if i_metoo %}on{% endif %}"><i class="bi {% if i_metoo %}bi-hand-thumbs-up-fill{% else %}bi-hand-thumbs-up{% endif %}"></i> I have this doubt too{% if metoo_count %} · {{ metoo_count }}{% endif %}</button></form>
+    {% elif metoo_count %}<span class="metoo-btn"><i class="bi bi-people-fill" style="color:var(--red)"></i> {{ metoo_count }} other student{{ metoo_count|pluralize }} had this doubt</span>{% endif %}
+    <div class="ms-auto d-flex gap-2">
+     {% if can_moderate %}{% if d.is_resolved %}<form method="post">{% csrf_token %}<button name="action" value="reopen" class="btn btn-sm btn-light"><i class="bi bi-arrow-counterclockwise"></i> Reopen</button></form>
+     {% else %}<form method="post">{% csrf_token %}<button name="action" value="resolve" class="btn btn-sm btn-warning"><i class="bi bi-check2-circle"></i> Mark resolved</button></form>{% endif %}{% endif %}
+     {% if user.is_staff_member or is_owner and not replies %}<form method="post">{% csrf_token %}<button name="action" value="delete" class="btn btn-sm btn-light text-danger" onclick="return confirm('Delete this doubt?')"><i class="bi bi-trash"></i></button></form>{% endif %}
+    </div>
+   </div>
+  </div>
+
+  <h5 class="section-title">{{ replies|length }} repl{{ replies|length|pluralize:"y,ies" }}</h5>
+  <div class="thread">
+   {% for r in replies %}
+   <div class="msg {% if r.author.is_staff_member %}staff{% endif %} {% if r.author == user %}mine{% endif %} {% if r.is_accepted %}accepted{% endif %}" {% if forloop.last %}id="latest"{% endif %}>
+    <span class="avatar">{{ r.author|initial }}</span>
+    <div class="msg-body">
+     <div class="d-flex flex-wrap align-items-center gap-2 mb-1 small">
+      <b>{% if r.author == user %}You{% else %}{{ r.author.first_name|default:r.author.username }}{% endif %}</b>
+      {% if r.author.is_staff_member %}<span class="role-chip" style="background:var(--red-50);color:var(--red-600)">{% if r.author.is_superuser %}Owner{% else %}{{ r.author.get_role_display }}{% endif %}</span>{% endif %}
+      <span class="text-muted">{{ r.created_at|timesince }} ago</span>
+      {% if r.is_accepted %}<span class="best-tag ms-auto"><i class="bi bi-patch-check-fill"></i> Best answer</span>{% endif %}
+     </div>
+     <div>{{ r.body|rich }}</div>
+     {% if r.image %}<a href="{{ r.image.url }}" target="_blank"><img src="{{ r.image.url }}" class="img-fluid rounded-3 border" style="max-height:300px" alt=""></a>{% endif %}
+     {% if can_moderate and r.author.is_staff_member and not r.is_accepted %}<form method="post" class="mt-2">{% csrf_token %}<input type="hidden" name="reply" value="{{ r.pk }}"><button name="action" value="accept" class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-patch-check"></i> This solved it</button></form>{% endif %}
+    </div>
+   </div>
+   {% empty %}
+   <div class="card p-4 text-center text-muted mb-3"><i class="bi bi-hourglass-split fs-3" style="color:var(--red)"></i><div class="mt-1">{% if is_owner %}Your doubt is in the queue. An instructor will reply soon.{% else %}No replies yet.{% endif %}</div></div>
+   {% endfor %}
+  </div>
+
+  {% if can_reply %}
+  <div class="card p-3 p-lg-4 reply-box">
+   <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="reply">
+    {% for e in form.body.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    <textarea name="body" class="form-control mb-2" rows="3" placeholder="{% if user.is_staff_member %}Write an answer… use ``` around code{% else %}Add more details or reply to your instructor…{% endif %}" required></textarea>
+    <div class="d-flex flex-wrap align-items-center gap-3">
+     <label class="btn btn-sm btn-light mb-0"><i class="bi bi-image"></i> <span id="rimg">Photo</span><input type="file" name="image" accept="image/*" class="d-none" onchange="rimg.textContent=this.files[0]?this.files[0].name:'Photo'"></label>
+     <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="mark_resolved" id="mr"><label class="form-check-label small" for="mr">{% if user.is_staff_member %}Mark as resolved{% else %}My doubt is solved{% endif %}</label></div>
+     <button class="btn btn-primary ms-auto px-4"><i class="bi bi-send"></i> Send</button>
+    </div>
+   </form>
+  </div>
+  {% endif %}
+ </div>
+
+ <div class="col-lg-4">
+  <div class="card card-dark p-4 mb-3 reveal" style="--i:1" data-rb="spotlight">
+   <h6 class="mb-3">Status</h6>
+   <ol class="list-unstyled mb-0 small">
+    <li class="d-flex gap-2 mb-2"><i class="bi bi-check-circle-fill" style="color:#ff5a4f"></i> Asked {{ d.created_at|date:"d M, H:i" }}</li>
+    <li class="d-flex gap-2 mb-2 {% if not d.has_staff_reply %}text-muted{% endif %}"><i class="bi {% if d.has_staff_reply %}bi-check-circle-fill{% else %}bi-circle{% endif %}" style="color:#ff5a4f"></i> Instructor answered</li>
+    <li class="d-flex gap-2 {% if not d.is_resolved %}text-muted{% endif %}"><i class="bi {% if d.is_resolved %}bi-check-circle-fill{% else %}bi-circle{% endif %}" style="color:#ff5a4f"></i> Resolved</li>
+   </ol>
+  </div>
+  {% if not user.is_student %}<div class="card p-4 mb-3"><h6>Student</h6><a href="{% url 'student_report' d.student.pk %}" class="fw-semibold">{{ d.student }}</a><div class="small text-muted">{{ d.student.username }} · {{ d.student.school|default:"In-house" }}{% if d.student.grade %} · Grade {{ d.student.grade }}{% endif %}</div></div>{% endif %}
+  {% if related %}<div class="card p-4"><h6>Related answered doubts</h6><ul class="list-unstyled mb-0 small">{% for r in related %}<li class="py-1 border-top"><a href="{% url 'doubt_detail' r.pk %}">{{ r.title }}</a></li>{% endfor %}</ul></div>{% endif %}
+ </div>
+</div>
+{% endblock %}

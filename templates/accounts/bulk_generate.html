@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Auto-generate accounts{% endblock %}
+{% block content %}
+<div class="row g-4">
+ <div class="col-lg-7"><div class="card p-4">
+  <h4><i class="bi bi-magic"></i> Auto-generate student accounts</h4>
+  <p class="text-muted small">Usernames are created automatically from the school code and year (e.g. <code>dps260001</code>, or <code>gnr260001</code> for in-house students), with easy-to-type random passwords.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}{% include "_form.html" %}
+   <button class="btn btn-primary"><i class="bi bi-lightning"></i> Generate accounts</button></form>
+ </div></div>
+ <div class="col-lg-5"><div class="card p-4">
+  <h6>CSV format</h6><p class="small text-muted">Save from Excel/Google Sheets as CSV. Only <code>first_name</code> is really needed; other columns are optional.</p>
+  <pre class="bg-light p-2 small rounded">first_name,last_name,grade,batch,email,phone
+Aarav,Sharma,6,A,,9876500001
+Diya,Patel,6,A,,
+Kabir,Reddy,7,B,kabir@example.com,</pre>
+  <a class="btn btn-sm btn-outline-secondary" download="students-template.csv" href="data:text/csv;charset=utf-8,first_name%2Clast_name%2Cgrade%2Cbatch%2Cemail%2Cphone%0A">Download blank template</a>
+ </div></div>
+</div>
+{% endblock %}

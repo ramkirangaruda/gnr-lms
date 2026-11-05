@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-banner mb-4 reveal">
+ <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+  <div><div class="eyebrow mb-1">{% if user.is_school_admin %}School coordinator{% elif user.is_owner %}Owner{% else %}Instructor{% endif %} dashboard</div><h2 class="mb-1">{% if user.is_school_admin %}{{ user.school }}{% else %}Welcome back, {{ user.first_name|default:user.username }}{% endif %}</h2>
+   <p class="text-muted mb-0">{% if n_open_doubts %}{{ n_open_doubts }} doubt{{ n_open_doubts|pluralize }} waiting for an answer.{% else %}No doubts waiting. Nice work!{% endif %}</p></div>
+  <div class="d-flex flex-wrap gap-2">
+   {% if user.is_staff_member %}<div class="dropdown"><button class="btn btn-primary btn-glow" data-bs-toggle="dropdown"><i class="bi bi-plus-lg"></i> Create</button><ul class="dropdown-menu dropdown-menu-end">
+    <li><a class="dropdown-item" href="{% url 'course_create' %}"><i class="bi bi-journal-plus"></i> Course</a></li><li><a class="dropdown-item" href="{% url 'certificate_issue' %}"><i class="bi bi-award"></i> Certificate</a></li>
+    <li><a class="dropdown-item" href="{% url 'newsletter_create' %}"><i class="bi bi-newspaper"></i> Newsletter</a></li><li><a class="dropdown-item" href="{% url 'competition_create' %}"><i class="bi bi-trophy"></i> Competition</a></li><li><a class="dropdown-item" href="{% url 'gallery_create' %}"><i class="bi bi-image"></i> Gallery photo</a></li></ul></div>{% endif %}
+   <a class="btn btn-ghost-light" href="{% url 'bulk_generate' %}"><i class="bi bi-magic"></i> Generate logins</a>
+  </div>
+ </div>
+</div>
+<div class="row g-3 mb-4">
+ <div class="col-6 col-lg-3">{% url 'students_overview' as h %}{% include "portal/_stat.html" with href=h icon="bi-people" n=n_students label="Students" i=1 %}</div>
+ <div class="col-6 col-lg-3">{% url 'course_list' as h %}{% include "portal/_stat.html" with href=h icon="bi-journal-code" n=n_courses label="Courses" i=2 %}</div>
+ <div class="col-6 col-lg-3">{% url 'doubt_list' as h %}{% include "portal/_stat.html" with href=h icon="bi-chat-dots" n=n_open_doubts label="Doubts to answer" i=3 extra="card-dark" %}</div>
+ <div class="col-6 col-lg-3">{% url 'certificate_list' as h %}{% include "portal/_stat.html" with href=h icon="bi-award" n=n_certs label="Certificates issued" i=4 %}</div>
+</div>
+<div class="small text-muted mb-4 reveal" style="--i:5"><i class="bi bi-person-badge"></i> {{ n_in_house }} in-house · {{ n_school }} school students</div>
+<div class="row g-4"><div class="col-lg-8">
+ <h5 class="section-title">{% if user.is_instructor %}My courses{% else %}Courses{% endif %}</h5>
+ <div class="card mb-4 overflow-hidden"><div class="table-responsive"><table class="table mb-0 align-middle"><thead><tr><th>Course</th><th>Lessons</th><th>Students</th><th></th></tr></thead><tbody>
+ {% for c in my_courses %}<tr><td><a class="fw-semibold text-decoration-none" href="{{ c.get_absolute_url }}">{{ c.title }}</a></td><td>{{ c.n_lessons }}</td><td>{{ c.n_students }}</td><td class="text-end"><a class="btn btn-sm btn-light" href="{% url 'course_report' c.slug %}"><i class="bi bi-graph-up"></i> Progress</a></td></tr>{% empty %}<tr><td colspan="4" class="text-muted">No courses yet.</td></tr>{% endfor %}</tbody></table></div></div>
+ <div class="row g-4"><div class="col-md-6"><div class="d-flex justify-content-between"><h5 class="section-title">Needs an answer</h5><a class="small fw-semibold" href="{% url 'doubt_list' %}">Queue</a></div><div class="card overflow-hidden">{% for d in recent_doubts %}<a class="doubt-item py-3" href="{% url 'doubt_detail' d.pk %}"><span class="status-dot status-open"></span><div class="min-w-0"><div class="fw-semibold small">{{ d.title }}</div><div class="small text-muted">{{ d.student.first_name|default:d.student }} · {{ d.course|default:"General" }} · {{ d.created_at|timesince }} ago{% if d.n_metoo %} · <b style="color:var(--red)">+{{ d.n_metoo }}</b>{% endif %}</div></div></a>{% empty %}<div class="p-3 small text-muted">All caught up 🎉</div>{% endfor %}</div></div>
+ <div class="col-md-6"><h5 class="section-title">Latest quiz attempts</h5><div class="card overflow-hidden"><div class="list-group list-group-flush">{% for a in recent_attempts %}<div class="list-group-item small d-flex justify-content-between align-items-center"><span><a href="{% url 'student_report' a.student_id %}">{{ a.student }}</a> · {{ a.quiz.title }}</span><span class="status-badge {% if a.passed %}resolved{% else %}open{% endif %}">{{ a.percent }}%</span></div>{% empty %}<div class="list-group-item small text-muted">None yet.</div>{% endfor %}</div></div></div></div>
+ {% if schools %}<h5 class="section-title mt-4">Schools</h5><div class="card overflow-hidden"><table class="table table-hover mb-0"><tbody>{% for s in schools %}<tr><td><a class="fw-semibold text-decoration-none" href="{% url 'students_overview' %}?school={{ s.pk }}">{{ s }}</a></td><td class="text-end text-muted">{{ s.n }} students</td></tr>{% empty %}<tr><td class="text-muted">No schools yet. <a href="{% url 'school_create' %}">Add one</a>.</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+</div><div class="col-lg-4">{% include "portal/_side.html" %}</div></div>
+{% endblock %}

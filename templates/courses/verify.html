@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}Verify certificate{% endblock %}
+{% block content %}<div class="row justify-content-center"><div class="col-md-6"><div class="card p-5 text-center">
+{% if c %}<i class="bi bi-patch-check-fill display-3 text-success"></i><h3 class="mt-2">Genuine certificate</h3>
+<p class="mb-1"><b>{{ c.title }}</b></p><p class="mb-1">Awarded to <b>{{ c.student.get_full_name|default:c.student.username }}</b></p>
+<p class="text-muted small">{{ c.course|default:c.achievement }} · issued {{ c.issued_on|date:"d M Y" }} · ID {{ c.short_code }}</p>
+{% else %}<i class="bi bi-x-octagon-fill display-3 text-danger"></i><h3 class="mt-2">Certificate not found</h3><p class="text-muted">This certificate does not exist or has been revoked.</p>{% endif %}
+</div></div></div>{% endblock %}

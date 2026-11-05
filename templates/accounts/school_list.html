@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Schools{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3"><h3>Partner schools</h3><a class="btn btn-primary" href="{% url 'school_create' %}"><i class="bi bi-plus"></i> Add school</a></div>
+<div class="alert alert-info small">To give a school a login for its coordinator, <a href="{% url 'user_create' %}">create a login</a> with role <b>School Admin</b> and pick the school. They will see only their own students' progress.</div>
+<div class="card"><table class="table align-middle mb-0"><thead><tr><th>School</th><th>Code</th><th>City</th><th>Contact</th><th>Students</th><th></th></tr></thead><tbody>
+{% for s in schools %}<tr><td class="fw-semibold">{{ s.name }}{% if not s.is_active %} <span class="badge bg-secondary">inactive</span>{% endif %}</td><td><code>{{ s.code }}</code></td><td>{{ s.city }}</td><td class="small">{{ s.contact_email }} {{ s.contact_phone }}</td>
+<td><a href="{% url 'students_overview' %}?school={{ s.pk }}">{{ s.n_students }}</a></td><td class="text-end"><a class="btn btn-sm btn-light" href="{% url 'school_edit' s.pk %}"><i class="bi bi-pencil"></i></a></td></tr>
+{% empty %}<tr><td colspan="6" class="text-center text-muted py-4">No schools yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}
