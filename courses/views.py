@@ -4,12 +4,15 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Max, Prefetch, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from accounts.models import User
 from accounts.permissions import can_view_student, staff_required, visible_students
 
+from . import bunny
 from .doubts import visible_doubts
 from .forms import CertificateForm, CourseForm, EnrollForm, LessonForm, QuestionForm, QuizForm, parse_usernames
 from .models import (Certificate, Choice, Course, Enrollment, Lesson, LessonProgress, Question,
@@ -140,7 +143,10 @@ def course_delete(request, slug):
     course = _get_course_for_edit(request, slug)
     if request.method == "POST":
         title = course.title
+        video_ids = [v for v in course.lessons.values_list("bunny_video_id", flat=True) if v]
         course.delete()
+        for video_id in video_ids:
+            bunny.delete_video(video_id)
         messages.success(request, f"Deleted course “{title}”.")
         return redirect("course_list")
     return render(request, "courses/confirm_delete.html", {"obj": course, "kind": "course",
@@ -182,15 +188,39 @@ def lesson_form(request, slug, pk=None):
     course = _get_course_for_edit(request, slug)
     lesson = get_object_or_404(Lesson, pk=pk, course=course) if pk else None
     initial = None if lesson else {"order": (course.lessons.aggregate(m=Max("order"))["m"] or 0) + 1}
-    form = LessonForm(request.POST or None, request.FILES or None, instance=lesson, initial=initial)
+    form = LessonForm(request.POST or None, request.FILES or None, instance=lesson, initial=initial, course=course)
     if request.method == "POST" and form.is_valid():
         l = form.save(commit=False)
         l.course = course
         l.save()
+        if form.old_bunny_video_id:
+            bunny.delete_video(form.old_bunny_video_id)
         messages.success(request, "Lesson saved.")
         return redirect("lesson_detail", slug=slug, pk=l.pk)
-    return render(request, "courses/form.html", {"form": form, "course": course, "back": course.get_absolute_url(),
-                                                 "title": "Edit lesson" if lesson else f"Add lesson to {course.title}"})
+    return render(request, "courses/lesson_form.html", {
+        "form": form, "course": course, "lesson": lesson, "back": course.get_absolute_url(),
+        "bunny_enabled": bunny.is_enabled(),
+        "title": "Edit lesson" if lesson else f"Add lesson to {course.title}"})
+
+
+@staff_required
+@require_POST
+def lesson_bunny_upload(request, slug):
+    """Create an empty Bunny video and hand the browser short-lived TUS upload credentials.
+
+    Only instructors who can manage this course (or owners) get here; the API key stays on the server.
+    """
+    course = _get_course_for_edit(request, slug)
+    if not bunny.is_enabled():
+        return JsonResponse({"error": "Bunny Stream is not set up on this server."}, status=503)
+    title = (request.POST.get("title") or "").strip() or "Lesson video"
+    try:
+        video_id = bunny.create_video(f"{course.title} – {title}")
+    except bunny.BunnyError:
+        return JsonResponse({"error": "Could not reach Bunny Stream. Please try again."}, status=502)
+    creds = bunny.tus_credentials(video_id)
+    creds["token"] = bunny.make_upload_token(course.pk, video_id)
+    return JsonResponse(creds)
 
 
 @staff_required
@@ -198,7 +228,9 @@ def lesson_delete(request, slug, pk):
     course = _get_course_for_edit(request, slug)
     lesson = get_object_or_404(Lesson, pk=pk, course=course)
     if request.method == "POST":
+        video_id = lesson.bunny_video_id
         lesson.delete()
+        bunny.delete_video(video_id)
         messages.success(request, "Lesson deleted.")
         return redirect(course)
     return render(request, "courses/confirm_delete.html", {"obj": lesson, "kind": "lesson"})

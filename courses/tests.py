@@ -1,8 +1,12 @@
+import hashlib
 import io
+import json
+import re
+from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from accounts.models import School, User
 from courses.models import Certificate, Course, Doubt, Enrollment, LessonProgress, Quiz, QuizAttempt
@@ -266,3 +270,156 @@ class DoubtHubTests(TestCase):
         self.ask()
         self.login("instructor1", "instructor123")
         self.assertEqual(self.client.get("/dashboard/").context["nav_doubts"], 1)
+
+
+BUNNY = {"BUNNY_STREAM_LIBRARY_ID": "123456", "BUNNY_STREAM_API_KEY": "secret-api-key",
+         "BUNNY_STREAM_TOKEN_KEY": "embed-token-key"}
+VID = "0b1d2c3e-4f50-6172-8394-a5b6c7d8e9f0"
+VID2 = "11111111-2222-3333-4444-555555555555"
+
+
+class FakeResponse:
+    def __init__(self, body):
+        self.body = body
+
+    def read(self):
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+@override_settings(**BUNNY)
+class BunnyStreamTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("setup_gnr", owner="owner", password="owner123", demo=True, stdout=io.StringIO())
+        cls.course = Course.objects.get()
+        cls.lesson = cls.course.lessons.first()
+        cls.student = User.objects.filter(role="student").order_by("username").first()
+        Enrollment.objects.get_or_create(student=cls.student, course=cls.course)
+        cls.upload_url = f"/courses/{cls.course.slug}/lessons/bunny-upload/"
+
+    def setUp(self):
+        self.calls = []
+
+        def fake_urlopen(req, timeout=None):
+            self.calls.append(req)
+            if req.get_method() == "POST":
+                return FakeResponse(json.dumps({"guid": VID}).encode())
+            return FakeResponse(b"")
+
+        patcher = mock.patch("courses.bunny.urllib.request.urlopen", side_effect=fake_urlopen)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def login(self, username, pw):
+        self.assertTrue(self.client.login(username=username, password=pw))
+
+    def test_instructor_gets_signed_upload_credentials(self):
+        self.login("instructor1", "instructor123")
+        r = self.client.post(self.upload_url, {"title": "Motors"})
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertEqual(d["video_id"], VID)
+        self.assertEqual(d["library_id"], "123456")
+        expected = hashlib.sha256(f"123456secret-api-key{d['expires']}{VID}".encode()).hexdigest()
+        self.assertEqual(d["signature"], expected)
+        self.assertNotIn("secret-api-key", r.content.decode())
+        req = self.calls[0]
+        self.assertEqual(req.full_url, "https://video.bunnycdn.com/library/123456/videos")
+        self.assertEqual(req.get_header("Accesskey"), "secret-api-key")
+
+    def test_upload_restricted_to_own_courses(self):
+        User.objects.create_user("ins2", password="ins2pass", role="instructor")
+        self.login("ins2", "ins2pass")
+        self.assertEqual(self.client.post(self.upload_url).status_code, 403)
+        self.login(self.student.username, "student123")
+        self.assertEqual(self.client.post(self.upload_url).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.client.post(self.upload_url).status_code, 302)
+        self.assertEqual(self.calls, [])
+        self.login("instructor1", "instructor123")
+        self.assertEqual(self.client.get(self.upload_url).status_code, 405)
+
+    @override_settings(BUNNY_STREAM_API_KEY="")
+    def test_disabled_without_config(self):
+        self.login("instructor1", "instructor123")
+        self.assertEqual(self.client.post(self.upload_url).status_code, 503)
+        r = self.client.get(f"/courses/{self.course.slug}/lessons/{self.lesson.pk}/edit/")
+        self.assertNotContains(r, "bunny-file")
+
+    def _save_lesson(self, lesson, **extra):
+        data = {"title": lesson.title, "order": lesson.order, "duration_minutes": 5, "video_url": lesson.video_url}
+        data.update(extra)
+        return self.client.post(f"/courses/{self.course.slug}/lessons/{lesson.pk}/edit/", data)
+
+    def test_attach_play_replace_and_delete(self):
+        self.login("instructor1", "instructor123")
+        self.assertContains(self.client.get(f"/courses/{self.course.slug}/lessons/{self.lesson.pk}/edit/"), "bunny-file")
+        token = self.client.post(self.upload_url, {"title": "Motors"}).json()["token"]
+        self.assertEqual(self._save_lesson(self.lesson, bunny_upload_token=token).status_code, 302)
+        self.lesson.refresh_from_db()
+        self.assertEqual(self.lesson.bunny_video_id, VID)
+
+        # a student sees a signed, expiring Bunny player instead of YouTube
+        self.login(self.student.username, "student123")
+        r = self.client.get(f"/courses/{self.course.slug}/lessons/{self.lesson.pk}/")
+        m = re.search(r'https://iframe\.mediadelivery\.net/embed/123456/' + VID + r'\?token=([0-9a-f]{64})&amp;expires=(\d+)',
+                      r.content.decode())
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(1), hashlib.sha256(f"embed-token-key{VID}{m.group(2)}".encode()).hexdigest())
+        self.assertNotContains(r, "youtube-nocookie.com")
+
+        # replacing the video deletes the old one from Bunny
+        from courses import bunny
+        self.login("instructor1", "instructor123")
+        self._save_lesson(self.lesson, bunny_upload_token=bunny.make_upload_token(self.course.pk, VID2))
+        self.lesson.refresh_from_db()
+        self.assertEqual(self.lesson.bunny_video_id, VID2)
+        self.assertEqual((self.calls[-1].get_method(), self.calls[-1].full_url),
+                         ("DELETE", f"https://video.bunnycdn.com/library/123456/videos/{VID}"))
+
+        # removing it falls back to the YouTube link
+        self._save_lesson(self.lesson, remove_bunny_video="on")
+        self.lesson.refresh_from_db()
+        self.assertEqual(self.lesson.bunny_video_id, "")
+        self.assertTrue(self.calls[-1].full_url.endswith(VID2))
+        self.assertContains(self.client.get(f"/courses/{self.course.slug}/lessons/{self.lesson.pk}/"), "youtube-nocookie.com")
+
+    def test_lesson_delete_removes_bunny_video(self):
+        self.lesson.bunny_video_id = VID
+        self.lesson.save()
+        self.login("instructor1", "instructor123")
+        self.client.post(f"/courses/{self.course.slug}/lessons/{self.lesson.pk}/delete/")
+        self.assertEqual(self.calls[-1].get_method(), "DELETE")
+        self.assertTrue(self.calls[-1].full_url.endswith(VID))
+
+    def test_forged_or_foreign_token_rejected(self):
+        from courses import bunny
+        other = Course.objects.create(title="Other course")
+        self.login("instructor1", "instructor123")
+        for token in ["not-a-token", bunny.make_upload_token(other.pk, VID2)]:
+            r = self._save_lesson(self.lesson, bunny_upload_token=token)
+            self.assertEqual(r.status_code, 200)
+            self.assertContains(r, "upload the video again")
+        self.lesson.refresh_from_db()
+        self.assertEqual(self.lesson.bunny_video_id, "")
+
+    @override_settings(BUNNY_STREAM_TOKEN_KEY="")
+    def test_unsigned_embed_when_no_token_key(self):
+        self.lesson.bunny_video_id = VID
+        self.assertEqual(self.lesson.bunny_embed_url(),
+                         f"https://iframe.mediadelivery.net/embed/123456/{VID}?autoplay=false&preload=true&responsive=true")
+
+    def test_new_lesson_with_youtube_still_works(self):
+        self.login("instructor1", "instructor123")
+        self.client.post(f"/courses/{self.course.slug}/lessons/new/", {
+            "title": "YT lesson", "order": 9, "duration_minutes": 3, "video_url": "https://youtu.be/dQw4w9WgXcQ"})
+        lesson = self.course.lessons.get(title="YT lesson")
+        self.assertEqual(lesson.bunny_video_id, "")
+        self.assertContains(self.client.get(f"/courses/{self.course.slug}/lessons/{lesson.pk}/"),
+                            "youtube-nocookie.com/embed/dQw4w9WgXcQ")

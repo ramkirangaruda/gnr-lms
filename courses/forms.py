@@ -3,6 +3,7 @@ from django import forms
 from accounts.forms import StyledMixin
 from accounts.models import School, User
 
+from . import bunny
 from .models import Certificate, Course, Lesson, Question, Quiz
 
 VIDEO_EXTS = (".mp4", ".webm", ".mov", ".m4v")
@@ -20,16 +21,51 @@ class CourseForm(StyledMixin, forms.ModelForm):
 
 
 class LessonForm(StyledMixin, forms.ModelForm):
+    # Filled in by the browser after it finishes uploading to Bunny Stream (see lesson_form.html).
+    bunny_upload_token = forms.CharField(required=False, widget=forms.HiddenInput)
+    remove_bunny_video = forms.BooleanField(required=False, label="Remove the Bunny Stream video from this lesson")
+
     class Meta:
         model = Lesson
         fields = ["title", "order", "video_url", "video_file", "content", "attachment", "duration_minutes"]
         widgets = {"content": forms.Textarea(attrs={"rows": 6})}
+
+    def __init__(self, *args, course=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.course = course
+        self.new_bunny_video_id = None
+        if not self.instance.bunny_video_id:
+            del self.fields["remove_bunny_video"]
 
     def clean_video_file(self):
         f = self.cleaned_data.get("video_file")
         if f and hasattr(f, "name") and not f.name.lower().endswith(VIDEO_EXTS):
             raise forms.ValidationError("Upload an MP4/WebM/MOV video.")
         return f
+
+    def clean(self):
+        d = super().clean()
+        token = d.get("bunny_upload_token")
+        if token:
+            video_id = bunny.read_upload_token(token, self.course.pk if self.course else None)
+            if not video_id:
+                self.add_error(None, "The video upload link has expired or is invalid. Please upload the video again.")
+            else:
+                self.new_bunny_video_id = video_id
+        return d
+
+    def save(self, commit=True):
+        """Apply Bunny changes. Returns the lesson; the replaced/removed Bunny video id is in `old_bunny_video_id`."""
+        lesson = super().save(commit=False)
+        old = lesson.bunny_video_id
+        if self.new_bunny_video_id:
+            lesson.bunny_video_id = self.new_bunny_video_id
+        elif self.cleaned_data.get("remove_bunny_video"):
+            lesson.bunny_video_id = ""
+        self.old_bunny_video_id = old if old and old != lesson.bunny_video_id else None
+        if commit:
+            lesson.save()
+        return lesson
 
 
 class QuizForm(StyledMixin, forms.ModelForm):

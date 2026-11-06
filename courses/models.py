@@ -69,6 +69,7 @@ class Lesson(models.Model):
     order = models.PositiveIntegerField(default=0)
     video_url = models.URLField(blank=True, help_text="YouTube / Vimeo link (recommended: saves server bandwidth)")
     video_file = models.FileField(upload_to="lessons/videos/", blank=True, help_text="Or upload an MP4 file")
+    bunny_video_id = models.CharField(max_length=64, blank=True, help_text="Bunny Stream video GUID (set by the uploader)")
     content = models.TextField(blank=True, help_text="Notes / instructions shown below the video")
     attachment = models.FileField(upload_to="lessons/files/", blank=True, help_text="Worksheet, code, PDF…")
     duration_minutes = models.PositiveIntegerField(default=0)
@@ -87,6 +88,11 @@ class Lesson(models.Model):
         if m:
             return f"https://player.vimeo.com/video/{m.group(1)}"
         return url
+
+    def bunny_embed_url(self):
+        """Signed Bunny Stream player URL (empty when the lesson has no Bunny video)."""
+        from .bunny import embed_url
+        return embed_url(self.bunny_video_id)
 
     def __str__(self):
         return f"{self.course} – {self.title}"
