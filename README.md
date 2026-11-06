@@ -32,17 +32,32 @@ Run the tests: `python manage.py test`
 
 A VPS with **2 vCPU / 4 GB RAM** (e.g. AWS Lightsail, DigitalOcean or Hetzner, roughly $12–24/month) is enough.
 
+1. Point a DNS **A record** for your subdomain (e.g. `lms` → `lms.gnrrobotics.com`) at the server's IP address.
+2. On the server (Ubuntu 24.04, with Docker installed: `curl -fsSL https://get.docker.com | sh`):
+
 ```bash
-# on the server (Ubuntu), with Docker installed
-git clone <your repo> gnr_lms && cd gnr_lms
-cp .env.example .env          # edit: secret key, domain, DB password
+git clone https://github.com/ramkirangaruda/gnr-lms.git && cd gnr-lms
+cp .env.example .env          # edit: DJANGO_SECRET_KEY, LMS_DOMAIN, DJANGO_ALLOWED_HOSTS, CSRF origins, DB password
 docker compose up -d --build
 docker compose exec web python manage.py setup_gnr --owner admin --password 'ChooseAStrongPassword'
 ```
-This runs PostgreSQL, Redis, Django (gunicorn, 5 workers × 4 threads) and nginx (serves uploaded videos/images directly).
-Put HTTPS in front with Cloudflare (free) or Caddy/certbot. Until HTTPS is ready, set `SECURE_COOKIES=0`, or logins won't stick over plain http.
 
-**Backups:** `docker compose exec db pg_dump -U gnr gnr_lms > backup.sql` (schedule daily with cron) and copy the `media` volume.
+This runs PostgreSQL, Redis, Django (gunicorn, 5 workers × 4 threads) and **Caddy**, which gets a free Let's Encrypt
+HTTPS certificate for `LMS_DOMAIN` by itself, redirects http to https, and serves uploaded files directly.
+Ports 80 and 443 must be open in the server's firewall. **Never run `setup_gnr --demo` on the live server**: it creates
+logins with publicly known passwords.
+
+To try it on the bare IP before DNS is ready, set `LMS_DOMAIN=:80`, `SECURE_COOKIES=0`, and add the IP to
+`DJANGO_ALLOWED_HOSTS` and `http://<ip>` to `DJANGO_CSRF_TRUSTED_ORIGINS`. Switch back once the domain works.
+
+**Updating:** `git pull && docker compose up -d --build` (migrations run automatically on start).
+**Logs:** `docker compose logs -f web` (errors include the full traceback).
+
+**Backups:** `sh deploy/backup.sh` writes a database dump and a copy of all uploads to `backups/` and keeps 14 days.
+Schedule it nightly with `crontab -e` (the line is at the top of the script) and copy `backups/` off the server
+regularly (for example with `rclone` to Google Drive or Backblaze B2), because a backup on the same server dies with it.
+Restore (tested): `docker compose exec -T db pg_restore -U gnr -d gnr_lms --clean --if-exists < backups/db_<date>.dump`,
+then the uploads: `docker compose exec -T web sh -c 'tar -xzf - -C /app' < backups/media_<date>.tar.gz`.
 
 **Videos:** prefer **unlisted YouTube or Vimeo links**. They cost nothing in bandwidth and stream smoothly to every student at once. Uploaded MP4s work too, but they use your server's bandwidth.
 
@@ -74,6 +89,6 @@ courses/    courses, lessons, quizzes, progress, doubts, certificates, reports
 portal/     home page, dashboards, newsletters, gallery, competitions
 templates/  all pages (Bootstrap 5 + red/white/black theme in static/css/gnr.css, works on phones)
 frontend/   source for the React Bits animation islands (built into static/islands/)
-deploy/     nginx config
+deploy/     Caddyfile (HTTPS + uploads) and backup.sh
 ```
 The Django admin at `/admin/` (owners only) gives raw access to all data.

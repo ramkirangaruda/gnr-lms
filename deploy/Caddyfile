@@ -1,0 +1,31 @@
+# Caddy gets and renews a free Let's Encrypt HTTPS certificate for LMS_DOMAIN automatically,
+# and redirects http:// to https://. DNS for the domain must point at this server first.
+# For a quick test on a bare IP without a domain, set LMS_DOMAIN=:80 in .env (plain http, no certificate).
+{$LMS_DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 2GB
+	}
+
+	# Uploaded files (images, PDFs, MP4s) straight from the media volume, with range requests for video seeking.
+	handle_path /media/* {
+		root * /srv/media
+		header Cache-Control "public, max-age=604800"
+		file_server
+	}
+
+	handle {
+		reverse_proxy web:8000 {
+			transport http {
+				read_timeout 600s
+			}
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
