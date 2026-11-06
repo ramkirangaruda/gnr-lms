@@ -1,0 +1,18 @@
+# QA override: squeezes the whole stack onto 2 CPUs / ~4 GB, like the target 2 vCPU / 4 GB VPS.
+# The load generator runs on the other CPUs of the test machine.
+#   docker compose -f docker-compose.yml -f tests/docker-compose.qa.yml up -d --build
+services:
+  db:
+    cpuset: "0,1"
+    mem_limit: 1g
+    # same settings as production plus slow-query logging and pg_stat_statements for the report
+    command: postgres -c max_connections=200 -c shared_buffers=256MB -c shared_preload_libraries=pg_stat_statements -c log_min_duration_statement=250
+  redis:
+    cpuset: "0,1"
+    mem_limit: 256m
+  web:
+    cpuset: "0,1"
+    mem_limit: 2500m
+  caddy:
+    cpuset: "0,1"
+    mem_limit: 256m
