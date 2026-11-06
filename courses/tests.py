@@ -100,6 +100,7 @@ class LMSFlowTests(TestCase):
         data = {}
         for q in self.quiz.questions.all():
             data[f"q{q.id}"] = [str(ch.id) for ch in q.choices.filter(is_correct=True)]
+        self.client.get(f"/courses/{c.slug}/quizzes/{self.quiz.pk}/")  # opening the quiz starts its clock
         r = self.client.post(f"/courses/{c.slug}/quizzes/{self.quiz.pk}/", data)
         attempt = QuizAttempt.objects.get(student=self.student)
         self.assertEqual(attempt.percent, 100)
@@ -157,7 +158,8 @@ class LMSFlowTests(TestCase):
             "video_file": SimpleUploadedFile("v.mp4", b"\x00" * 100, content_type="video/mp4")})
         self.assertEqual(course.lessons.count(), 1)
         self.client.post(f"/courses/{course.slug}/quizzes/new/", {"title": "Q1", "pass_percentage": 50,
-                                                                  "time_limit_minutes": 0, "max_attempts": 0, "is_published": "on"})
+                                                                  "time_limit_minutes": 0, "max_attempts": 0,
+                                                                  "reveal_answers": "final", "is_published": "on"})
         quiz = course.quizzes.get()
         self.client.post(f"/courses/{course.slug}/quizzes/{quiz.pk}/manage/", {
             "text": "2+2?", "marks": 1, "order": 1, "choice_1": "3", "choice_2": "4", "correct": ["2"]})

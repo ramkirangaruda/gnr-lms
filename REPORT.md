@@ -6,6 +6,44 @@ Staging was the full Docker stack (Caddy, gunicorn, PostgreSQL 16, Redis) with t
 (1,516 seeded accounts, 10 courses, 4,500 enrolments, about 23k lesson completions and 12k quiz attempts, 585 doubts). No real email was sent:
 reset emails went to the container log. Bunny Stream was faked, because there's no account yet.
 
+## 0. Fix status (2026-11-06, after the fixes)
+
+Every finding that can be fixed in code or config is fixed, and each one has a regression test in
+`courses/tests_hardening.py`. Re-runs on the same 2-CPU staging stack after the fixes:
+
+| Suite | Before | After |
+|---|---|---|
+| Unit + regression tests (SQLite and PostgreSQL) | 37 pass | **56 pass** |
+| Browser walkthrough, every role | 57/57 | **57/57** (it caught one new bug, a `/admin/` redirect loop for signed-in students, now fixed) |
+| Security + integrity suite | 55/70 | **70/70** |
+| Quiz attempt race (20 parallel submits, limit 3) | 4 stored in 3 of 5 trials | **never more than 3** |
+| axe-core WCAG A/AA, 26 pages × 2 devices | contrast, labels and the other L-6 issues | **0 violations** |
+| Backup → restore drill | OK, on-server only | **OK, plus an off-server copy via rclone** |
+| 300 users for 5 min | 0% errors | **0% errors, no 502s**, quiz submit p95 42 ms |
+| Bulk-generate 500 logins | 87–89 s | **2 s** |
+
+| ID | Status | What changed |
+|---|---|---|
+| B-1 | Fixed | Lockout after 10 wrong passwords per account (100 per IP) for 15 min, HTTP 429. Password validators on every form, including first login. `/admin/login/` goes through the same throttled page. |
+| B-2 | Fixed | Every `/media/` request is permission-checked by Django, then Caddy sends the file (`X-Accel-Redirect`). Private files get random names. Thumbnails, newsletters and gallery stay public. |
+| H-1 | Fixed | The server starts the clock when the quiz opens. Refreshing does not reset it. Late answers score 0 and are marked late (30 s grace). |
+| H-2 | Fixed | New per-quiz setting "Show correct answers": after the last attempt or a pass (default), always, or never. |
+| H-3 | **Not fixed (capacity)** | Logins still cost about 0.2 s of CPU each, by design (password hashing). The first-login temporary passwords now use a cheaper hash. For whole-school events, stagger logins by class or use 4 vCPU. |
+| H-4 | Fixed in code | `/healthz`, Docker healthcheck, friendly 500 page, log caps (10 MB × 5 per container), error emails (`DJANGO_ADMINS`) and optional Sentry (`SENTRY_DSN`). **You still need** to sign up for a free uptime monitor and point it at `/healthz`. |
+| H-5 | Fixed in code | `deploy/backup.sh` copies each night's backup off the server with rclone when `BACKUP_REMOTE` is set. **You still need** to create the remote (Backblaze B2 or Google Drive) and do one restore drill on the real server. |
+| H-6 | **Not fixed (needs your account)** | Create the Bunny Stream account and test one real upload. |
+| M-1 | Fixed | Lesson attachments use an allow-list of file types (no HTML/SVG/JS) and always download. CSP header added. |
+| M-2 | Fixed | Submissions lock the student's quiz start row, so double submits and parallel submits count once. |
+| M-3 / M-4 | Fixed | Bulk generation takes a per-prefix database lock and uses a fast temporary hash. |
+| M-5 / M-6 | Fixed | Deleting an instructor keeps their replies ("Former GNR team member"). Students with certificates can't be deleted, only deactivated. |
+| M-7 | Fixed | Removed gunicorn `--max-requests` and matched keep-alive timeouts with Caddy. |
+| M-8 | Fixed | Sessions end when the browser closes unless "Keep me signed in" is ticked. |
+| L-1 … L-6 | Fixed | Revoke limited to the owner, the issuer or the course's instructor. CSP header. School admins see only their schools' courses and no quiz questions. 10 MB photo cap. Pinned requirements. Accessibility fixes (contrast, labels, skip link). |
+| L-7 | Not fixed | The doubt queue is still oldest first. That's a product choice, so it's left for you to decide. |
+
+**Still untested here:** real HTTPS certificates, real SMTP delivery, real Bunny playback, Safari/Firefox engines,
+and the real VPS. Run `tests/` once against the server after the first deploy.
+
 ## 1. Verdict: **GO WITH FIXES**
 
 1. Every role's core journey works end to end in a real browser (57/57), and all 37 unit tests pass on PostgreSQL. Access control held in every IDOR and role-escalation test I tried (34 checks).
@@ -14,7 +52,7 @@ reset emails went to the container log. Bunny Stream was faked, because there's 
 4. Two issues should block a public launch to children. There's **no login rate limiting** while weak passwords like `123456` and predictable usernames (`dps260001`…) are allowed. And **uploaded files (including "private" doubt photos) can be downloaded without logging in** by anyone who has the URL.
 5. Operations are thin. Backups work (restore verified) but stay on the same server. Nothing alerts anyone at 2 AM, container logs grow without limit, and the quiz timer and answer review make quiz scores easy to game.
 
-All of the must-fix items are small, contained code or config changes. I estimate 1–2 days of work. **Nothing has been fixed yet.**
+All of the must-fix items are small, contained code or config changes. **Update (same day): the code fixes are now done and re-tested. See section 0 below.**
 
 ## 2. Issue table
 
@@ -142,21 +180,21 @@ Cookies: `HttpOnly` + `SameSite=Lax` confirmed. `Secure` is on by default in pro
 ## 6. Pre-launch checklist
 
 **Must fix before launch**
-- [ ] B-1 Login throttling + password validators (incl. first-login form) + protect `/admin/`
-- [ ] B-2 Permission-checked media (or private storage + random file names)
-- [ ] H-4 `/healthz` + uptime monitor + error alerts (Sentry or email) + Docker log rotation + friendly 500 page
-- [ ] H-5 Nightly off-server backup copy, plus one restore drill on the real server
+- [x] B-1 Login throttling + password validators (incl. first-login form) + protect `/admin/`
+- [x] B-2 Permission-checked media (or private storage + random file names)
+- [ ] H-4 (code done) `/healthz` + uptime monitor + error alerts (Sentry or email) + Docker log rotation + friendly 500 page
+- [ ] H-5 (code done) Nightly off-server backup copy, plus one restore drill on the real server
 - [ ] H-6 Bunny account set up and one real upload/playback tested (or every launch video on YouTube)
-- [ ] H-1 / H-2 Server-side quiz timer and hidden answers, **if quiz scores count** for anything (certificates, school reports). Otherwise move to "soon after".
+- [x] H-1 / H-2 Server-side quiz timer and hidden answers, **if quiz scores count** for anything (certificates, school reports). Otherwise move to "soon after".
 - [ ] Merge PR #3, set real SMTP, run `tests/` once against the real server after the first deploy
 
 **Can follow in the first weeks**
 - [ ] H-3 Plan class logins (stagger) or move to 4 vCPU before a whole-school event
-- [ ] M-1 … M-8 (staff HTML uploads, attempt race, bulk-generate lock and speed, cascade deletes, worker recycling 502s, shared-PC sessions)
-- [ ] L-1 … L-7 (certificate revoke rights, CSP, school-admin course scope, image size cap, pinned deps, accessibility fixes, doubt sort)
+- [x] M-1 … M-8 (staff HTML uploads, attempt race, bulk-generate lock and speed, cascade deletes, worker recycling 502s, shared-PC sessions)
+- [x] L-1 … L-6 fixed, L-7 left (certificate revoke rights, CSP, school-admin course scope, image size cap, pinned deps, accessibility fixes, doubt sort)
 
 ## Re-running
 
 See `tests/README.md`. In short: start the QA stack with `tests/docker-compose.qa.yml`, seed with `tests/seed_staging.py`, then run
 `tests/e2e/walkthrough.js`, `tests/api/test_security_and_integrity.py`, `tests/load/lms.js` (k6) and the `tests/ops/` scripts.
-The security suite is written so each finding above is a FAIL today and should turn into a PASS when fixed.
+The security suite states the secure behaviour. It was 55/70 before the fixes and is 70/70 after them.

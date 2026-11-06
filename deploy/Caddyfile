@@ -7,18 +7,23 @@
 		max_size 2GB
 	}
 
-	# Uploaded files (images, PDFs, MP4s) straight from the media volume, with range requests for video seeking.
-	handle_path /media/* {
-		root * /srv/media
-		header Cache-Control "public, max-age=604800"
-		file_server
-	}
-
-	handle {
-		reverse_proxy web:8000 {
-			transport http {
-				read_timeout 600s
+	reverse_proxy web:8000 {
+		transport http {
+			read_timeout 600s
+			# shorter than gunicorn's --keep-alive, so Caddy never reuses a connection gunicorn already closed
+			keepalive 60s
+		}
+		# Uploaded files: Django checks permission (portal/media.py) and answers with X-Accel-Redirect;
+		# Caddy then sends the file from the uploads volume, with range requests for video seeking.
+		@accel header X-Accel-Redirect *
+		handle_response @accel {
+			root * /srv/media
+			rewrite * {rp.header.X-Accel-Redirect}
+			copy_response_headers {
+				include Cache-Control Content-Disposition
 			}
+			header X-Content-Type-Options nosniff
+			file_server
 		}
 	}
 
@@ -26,6 +31,7 @@
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' https://video.bunnycdn.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://iframe.mediadelivery.net; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
 		-Server
 	}
 }

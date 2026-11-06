@@ -4,6 +4,7 @@ import logging
 
 from django import forms
 from django.conf import settings
+from django.contrib.auth import password_validation
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.core.cache import cache
 from django.db.models import Q
@@ -41,6 +42,12 @@ class UserCreateForm(StyledMixin, forms.ModelForm):
         model = User
         fields = ["first_name", "last_name", "username", "email", "phone", "role",
                   "student_type", "school", "grade", "batch"]
+
+    def clean_password(self):
+        pw = self.cleaned_data.get("password")
+        if pw:
+            password_validation.validate_password(pw)
+        return pw
 
     def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -120,13 +127,23 @@ class BulkGenerateForm(StyledMixin, forms.Form):
 
 
 class ForcedPasswordChangeForm(StyledMixin, forms.Form):
-    new_password1 = forms.CharField(label="New password", widget=forms.PasswordInput, min_length=6)
+    new_password1 = forms.CharField(label="New password", widget=forms.PasswordInput,
+                                    help_text="At least 8 characters. Not just numbers, and not a common password like 'password1'.")
     new_password2 = forms.CharField(label="Confirm new password", widget=forms.PasswordInput)
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
 
     def clean(self):
         d = super().clean()
         if d.get("new_password1") != d.get("new_password2"):
             raise forms.ValidationError("Passwords do not match.")
+        if d.get("new_password1"):
+            try:
+                password_validation.validate_password(d["new_password1"], self.user)
+            except forms.ValidationError as e:
+                self.add_error("new_password1", e)
         return d
 
 

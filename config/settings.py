@@ -95,8 +95,21 @@ else:
 
 AUTH_USER_MODEL = "accounts.User"
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 6}},
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",  # every password people choose
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "accounts.hashers.TemporaryPasswordHasher",  # auto-generated first passwords only, see accounts/hashers.py
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+]
+# Failed-login throttle (accounts/throttle.py): after this many failures in LOGIN_LOCKOUT_SECONDS, wait.
+LOGIN_FAILS_PER_USER = int(env("LOGIN_FAILS_PER_USER", 10))
+LOGIN_FAILS_PER_IP = int(env("LOGIN_FAILS_PER_IP", 100))  # a whole school lab can share one IP
+LOGIN_LOCKOUT_SECONDS = int(env("LOGIN_LOCKOUT_SECONDS", 15 * 60))
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "home"
@@ -111,6 +124,8 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(env("MEDIA_ROOT", BASE_DIR / "media"))
+# Behind Caddy, Django only checks permission and Caddy sends the file (X-Accel-Redirect, see deploy/Caddyfile).
+MEDIA_ACCEL_REDIRECT = env_bool("MEDIA_ACCEL_REDIRECT", False)
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
@@ -145,6 +160,21 @@ LOGGING = {
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
     "loggers": {"django": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO"), "propagate": False}},
 }
+
+# ---- Being told when something breaks ----
+# DJANGO_ADMINS="Ram <ram@example.com>, ops@example.com": every server error (500) is emailed there (needs EMAIL_HOST).
+ADMINS = []
+for _a in filter(None, (x.strip() for x in env("DJANGO_ADMINS", "").split(","))):
+    _name, _, _mail = _a.rpartition("<")
+    ADMINS.append((_name.strip() or _a, _mail.rstrip(">").strip() or _a))
+if ADMINS:
+    LOGGING["handlers"]["mail_admins"] = {"class": "django.utils.log.AdminEmailHandler", "level": "ERROR"}
+    LOGGING["loggers"]["django.request"] = {"handlers": ["console", "mail_admins"], "level": "ERROR", "propagate": False}
+# SENTRY_DSN (free tier at sentry.io): errors with full tracebacks, grouped, with email/phone alerts.
+if env("SENTRY_DSN"):
+    import sentry_sdk
+    sentry_sdk.init(dsn=env("SENTRY_DSN"), send_default_pii=False, traces_sample_rate=0.0,
+                    environment=env("SENTRY_ENVIRONMENT", "production"))
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = env_bool("SECURE_COOKIES", True)

@@ -26,6 +26,8 @@ def rich(text):
 
 @register.filter
 def initial(user):
+    if not user:
+        return "?"
     name = user.get_full_name() or user.username
     return (name[:1] or "?").upper()
 

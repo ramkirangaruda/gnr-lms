@@ -14,8 +14,8 @@
  <form class="d-flex flex-wrap gap-2">
   <input type="hidden" name="tab" value="{{ tab }}">
   <input class="form-control form-control-sm" style="width:200px" name="q" value="{{ f.q }}" placeholder="Search doubts…">
-  <select name="course" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()"><option value="">All courses</option><option value="general" {% if f.course == 'general' %}selected{% endif %}>General</option>{% for c in courses %}<option value="{{ c.pk }}" {% if f.course == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.title|truncatechars:30 }}</option>{% endfor %}</select>
-  <select name="cat" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()"><option value="">All topics</option>{% for v, l in categories %}<option value="{{ v }}" {% if f.cat == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <select name="course" aria-label="Filter by course" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()"><option value="">All courses</option><option value="general" {% if f.course == 'general' %}selected{% endif %}>General</option>{% for c in courses %}<option value="{{ c.pk }}" {% if f.course == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.title|truncatechars:30 }}</option>{% endfor %}</select>
+  <select name="cat" aria-label="Filter by topic" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()"><option value="">All topics</option>{% for v, l in categories %}<option value="{{ v }}" {% if f.cat == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
   {% if user.is_instructor %}<div class="form-check form-switch d-flex align-items-center gap-2 ms-1"><input class="form-check-input" type="checkbox" name="mine" value="1" id="mine" {% if f.mine %}checked{% endif %} onchange="this.form.submit()"><label class="form-check-label small" for="mine">My courses</label></div>{% endif %}
  </form>
 </div>

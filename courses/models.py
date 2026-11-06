@@ -7,6 +7,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
+from . import uploads, validators
+
 User = settings.AUTH_USER_MODEL
 
 
@@ -44,6 +46,16 @@ class Course(models.Model):
     def get_absolute_url(self):
         return reverse("course_detail", args=[self.slug])
 
+    def can_view(self, user):
+        """Students: published + enrolled. School admins: courses their school's students are in. Staff: all."""
+        if not user.is_authenticated:
+            return False
+        if user.is_owner or user.is_instructor:
+            return True
+        if user.is_school_admin:
+            return bool(user.school_id) and self.enrollments.filter(student__school_id=user.school_id).exists()
+        return self.is_published and self.enrollments.filter(student=user).exists()
+
     def can_manage(self, user):
         return user.is_authenticated and (
             user.is_owner or (user.is_instructor and (self.created_by_id == user.id or self.instructors.filter(pk=user.pk).exists()))
@@ -68,10 +80,11 @@ class Lesson(models.Model):
     title = models.CharField(max_length=200)
     order = models.PositiveIntegerField(default=0)
     video_url = models.URLField(blank=True, help_text="YouTube / Vimeo link (recommended: saves server bandwidth)")
-    video_file = models.FileField(upload_to="lessons/videos/", blank=True, help_text="Or upload an MP4 file")
+    video_file = models.FileField(upload_to=uploads.lesson_video, max_length=255, blank=True, help_text="Or upload an MP4 file")
     bunny_video_id = models.CharField(max_length=64, blank=True, help_text="Bunny Stream video GUID (set by the uploader)")
     content = models.TextField(blank=True, help_text="Notes / instructions shown below the video")
-    attachment = models.FileField(upload_to="lessons/files/", blank=True, help_text="Worksheet, code, PDF…")
+    attachment = models.FileField(upload_to=uploads.lesson_attachment, max_length=255, blank=True,
+                                  validators=[validators.attachment_extension], help_text="Worksheet, code, PDF…")
     duration_minutes = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -116,6 +129,14 @@ class Quiz(models.Model):
     pass_percentage = models.PositiveIntegerField(default=50)
     time_limit_minutes = models.PositiveIntegerField(default=0, help_text="0 = no limit")
     max_attempts = models.PositiveIntegerField(default=0, help_text="0 = unlimited")
+
+    class Reveal(models.TextChoices):
+        FINAL = "final", "After the student passes or uses their last attempt"
+        ALWAYS = "always", "After every attempt"
+        NEVER = "never", "Never (students only see their score)"
+
+    reveal_answers = models.CharField("Show correct answers", max_length=10, choices=Reveal.choices,
+                                      default=Reveal.FINAL)
     is_published = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -130,7 +151,7 @@ class Quiz(models.Model):
 class Question(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="questions")
     text = models.TextField()
-    image = models.ImageField(upload_to="quiz/", blank=True)
+    image = models.ImageField(upload_to=uploads.quiz_image, blank=True, validators=[validators.image_size])
     marks = models.PositiveIntegerField(default=1)
     order = models.PositiveIntegerField(default=0)
 
@@ -156,7 +177,9 @@ class QuizAttempt(models.Model):
     score = models.PositiveIntegerField(default=0)
     total = models.PositiveIntegerField(default=0)
     answers = models.JSONField(default=dict)  # {question_id: [choice_ids]}
+    started_at = models.DateTimeField(null=True, blank=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
+    is_late = models.BooleanField(default=False, help_text="Submitted after the time limit: scored 0")
 
     class Meta:
         ordering = ["-submitted_at"]
@@ -169,6 +192,17 @@ class QuizAttempt(models.Model):
     @property
     def passed(self):
         return self.percent >= self.quiz.pass_percentage
+
+
+class QuizStart(models.Model):
+    """When a student opened a quiz. The server times the quiz from here, so refreshing the page doesn't reset the
+    clock, and the row doubles as a per-student lock so double/parallel submits can't exceed max_attempts."""
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="starts")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="quiz_starts")
+    started_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ("quiz", "student")
 
 
 class Doubt(models.Model):
@@ -187,7 +221,7 @@ class Doubt(models.Model):
     category = models.CharField(max_length=20, choices=Category.choices, default=Category.CONCEPT, db_index=True)
     title = models.CharField(max_length=200)
     body = models.TextField()
-    image = models.ImageField(upload_to="doubts/", blank=True, help_text="Photo of your circuit / code / robot")
+    image = models.ImageField(upload_to=uploads.doubt_image, blank=True, validators=[validators.image_size], help_text="Photo of your circuit / code / robot")
     is_private = models.BooleanField(default=False, help_text="Only instructors can see a private doubt")
     is_resolved = models.BooleanField(default=False, db_index=True)
     has_staff_reply = models.BooleanField(default=False, db_index=True)
@@ -220,9 +254,9 @@ class Doubt(models.Model):
 
 class DoubtReply(models.Model):
     doubt = models.ForeignKey(Doubt, on_delete=models.CASCADE, related_name="replies")
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)  # answers stay if the author is deleted
     body = models.TextField()
-    image = models.ImageField(upload_to="doubts/replies/", blank=True)
+    image = models.ImageField(upload_to=uploads.reply_image, blank=True, validators=[validators.image_size])
     is_accepted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -231,7 +265,8 @@ class DoubtReply(models.Model):
 
 
 class Certificate(models.Model):
-    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="certificates")
+    # PROTECT: a student with certificates can't be deleted (deactivate instead), so /verify/ links keep working.
+    student = models.ForeignKey(User, on_delete=models.PROTECT, related_name="certificates")
     course = models.ForeignKey(Course, null=True, blank=True, on_delete=models.SET_NULL, related_name="certificates")
     title = models.CharField(max_length=200, default="Certificate of Completion")
     achievement = models.CharField(max_length=300, blank=True,

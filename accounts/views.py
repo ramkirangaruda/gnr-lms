@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
@@ -5,14 +7,19 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db import transaction
+from django.db.models import Count, ProtectedError, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
+from . import throttle
 from .forms import (BulkGenerateForm, ForcedPasswordChangeForm, ResetRequestForm, ResetSetPasswordForm, SchoolForm,
                     UserCreateForm, UserEditForm)
 from .models import School, User
 from .permissions import manager_required, owner_required, visible_students
-from .services import bulk_create_students, credentials_csv_data_uri, random_password, username_prefix, _next_seq
+from .services import (bulk_create_students, credentials_csv_data_uri, lock_username_prefix, random_password,
+                       set_temporary_password, username_prefix, _next_seq)
+
+logger = logging.getLogger(__name__)
 
 
 def _manageable_users(actor):
@@ -60,13 +67,18 @@ def user_create(request):
             u.student_type = User.StudentType.SCHOOL if u.school else User.StudentType.IN_HOUSE
         if u.student_type == User.StudentType.IN_HOUSE:
             u.school = None
-        if not u.username:
-            prefix = username_prefix(u.student_type, u.school) if u.role == User.Role.STUDENT else u.role[:4] + "_"
-            u.username = f"{prefix}{_next_seq(prefix):04d}"
         password = form.cleaned_data["password"] or random_password()
-        u.set_password(password)
+        if form.cleaned_data["password"]:
+            u.set_password(password)
+        else:
+            set_temporary_password(u, password)
         u.must_change_password = not form.cleaned_data["password"]
-        u.save()
+        with transaction.atomic():
+            if not u.username:
+                prefix = username_prefix(u.student_type, u.school) if u.role == User.Role.STUDENT else u.role[:4] + "_"
+                lock_username_prefix(prefix)
+                u.username = f"{prefix}{_next_seq(prefix):04d}"
+            u.save()
         return render(request, "accounts/credentials.html", {
             "created": [(u, password)], "csv_uri": credentials_csv_data_uri([(u, password)])})
     return render(request, "accounts/user_form.html", {"form": form, "title": "Create login"})
@@ -91,7 +103,7 @@ def user_reset_password(request, pk):
     if request.method != "POST":
         return redirect("user_edit", pk=pk)
     password = random_password()
-    target.set_password(password)
+    set_temporary_password(target, password)
     target.must_change_password = True
     target.save(update_fields=["password", "must_change_password"])
     return render(request, "accounts/credentials.html", {
@@ -104,8 +116,12 @@ def user_delete(request, pk):
     if target == request.user:
         messages.error(request, "You cannot delete your own account.")
     elif request.method == "POST":
-        target.delete()
-        messages.success(request, f"Deleted {target.username}.")
+        try:
+            target.delete()
+            messages.success(request, f"Deleted {target.username}.")
+        except ProtectedError:
+            messages.error(request, f"{target.username} has certificates, so the account can't be deleted (their "
+                                    "certificate links must keep working). Untick “Active” on the account instead.")
     return redirect("user_list")
 
 
@@ -148,7 +164,7 @@ def school_form(request, pk=None):
 
 @login_required
 def first_password(request):
-    form = ForcedPasswordChangeForm(request.POST or None)
+    form = ForcedPasswordChangeForm(request.POST or None, user=request.user)
     if request.method == "POST" and form.is_valid():
         u = request.user
         u.set_password(form.cleaned_data["new_password1"])
@@ -160,6 +176,37 @@ def first_password(request):
     return render(request, "accounts/user_form.html", {
         "form": form, "title": "Set your new password",
         "intro": "For your security, please choose a new password before continuing."})
+
+
+class ThrottledLoginView(auth_views.LoginView):
+    """Normal login, but an account or IP with too many recent failures gets a 429 and must wait.
+
+    Students can choose not to stay signed in, so a shared school-lab PC forgets them when the browser closes.
+    """
+    template_name = "accounts/login.html"
+    redirect_authenticated_user = True
+
+    def post(self, request, *args, **kwargs):
+        username, ip = request.POST.get("username", ""), throttle.client_ip(request)
+        if throttle.is_locked(username, ip):
+            logger.warning("Login blocked for %r from %s: too many failed attempts", username[:50], ip)
+            form = self.get_form()
+            return self.render_to_response(self.get_context_data(form=form, locked=True), status=429)
+        return super().post(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        throttle.record_failure(self.request.POST.get("username", ""), throttle.client_ip(self.request))
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        throttle.clear(form.get_user().get_username())
+        response = super().form_valid(form)
+        if not self.request.POST.get("remember"):
+            self.request.session.set_expiry(0)  # ends when the browser closes
+        return response
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(lockout_minutes=settings.LOGIN_LOCKOUT_SECONDS // 60, **kwargs)
 
 
 class ForgotPasswordView(auth_views.PasswordResetView):
@@ -181,3 +228,12 @@ class ForgotPasswordView(auth_views.PasswordResetView):
 class ResetConfirmView(auth_views.PasswordResetConfirmView):
     template_name = "registration/password_reset_confirm.html"
     form_class = ResetSetPasswordForm
+
+
+def admin_login(request):
+    """/admin/login/ goes through the throttled login page; signed-in non-staff users get a 403, not a redirect loop."""
+    if request.user.is_authenticated:
+        if request.user.is_staff:
+            return redirect("/admin/")
+        raise PermissionDenied
+    return redirect("/login/?next=/admin/")

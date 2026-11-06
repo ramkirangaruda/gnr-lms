@@ -34,7 +34,7 @@
     <span class="avatar">{{ r.author|initial }}</span>
     <div class="msg-body">
      <div class="d-flex flex-wrap align-items-center gap-2 mb-1 small">
-      <b>{% if r.author == user %}You{% else %}{{ r.author.first_name|default:r.author.username }}{% endif %}</b>
+      <b>{% if r.author == user %}You{% elif not r.author %}Former GNR team member{% else %}{{ r.author.first_name|default:r.author.username }}{% endif %}</b>
       {% if r.author.is_staff_member %}<span class="role-chip" style="background:var(--red-50);color:var(--red-600)">{% if r.author.is_superuser %}Owner{% else %}{{ r.author.get_role_display }}{% endif %}</span>{% endif %}
       <span class="text-muted">{{ r.created_at|timesince }} ago</span>
       {% if r.is_accepted %}<span class="best-tag ms-auto"><i class="bi bi-patch-check-fill"></i> Best answer</span>{% endif %}

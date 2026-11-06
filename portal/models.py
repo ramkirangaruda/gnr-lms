@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 
@@ -8,7 +9,8 @@ class Newsletter(models.Model):
     summary = models.CharField(max_length=300, blank=True)
     body = models.TextField(blank=True)
     cover = models.ImageField(upload_to="newsletters/", blank=True)
-    pdf = models.FileField(upload_to="newsletters/pdf/", blank=True, help_text="Optional PDF edition")
+    pdf = models.FileField(upload_to="newsletters/pdf/", blank=True, help_text="Optional PDF edition",
+                           validators=[FileExtensionValidator(["pdf"])])
     is_published = models.BooleanField(default=True)
     published_on = models.DateField(default=timezone.localdate)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)

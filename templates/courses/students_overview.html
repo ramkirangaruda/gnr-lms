@@ -2,7 +2,7 @@
 {% block content %}
 <h3>Student performance</h3>
 <form class="row g-2 mb-3"><div class="col-md-5"><input class="form-control" name="q" value="{{ q }}" placeholder="Search name, username, batch"></div>
-{% if schools %}<div class="col-md-4"><select name="school" class="form-select"><option value="">All schools & in-house</option>{% for s in schools %}<option value="{{ s.pk }}" {% if school == s.pk|stringformat:"s" %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>{% endif %}
+{% if schools %}<div class="col-md-4"><select name="school" class="form-select" aria-label="Filter by school"><option value="">All schools & in-house</option>{% for s in schools %}<option value="{{ s.pk }}" {% if school == s.pk|stringformat:"s" %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>{% endif %}
 <div class="col-md-3"><button class="btn btn-outline-primary w-100">Filter</button></div></form>
 <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Student</th><th>School</th><th>Grade</th><th>Courses</th><th>Lessons done</th><th>Quiz attempts</th><th>Certificates</th><th>Last login</th></tr></thead><tbody>
 {% for s in page %}<tr><td><a href="{% url 'student_report' s.pk %}">{{ s }}</a><div class="small text-muted font-monospace">{{ s.username }}</div></td><td class="small">{{ s.school|default:"In-house" }}</td><td class="small">{{ s.grade }} {{ s.batch }}</td><td>{{ s.n_courses }}</td><td>{{ s.n_lessons }}</td><td>{{ s.n_attempts }}</td><td>{{ s.n_certs }}</td><td class="small">{{ s.last_login|date:"d M"|default:"never" }}</td></tr>

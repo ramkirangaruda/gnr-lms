@@ -173,3 +173,15 @@ def competition_detail(request, pk):
 @staff_required
 def competition_form(request, pk=None):
     return _crud(request, Competition, CompetitionForm, pk, "/competitions/", "Competition")
+
+
+def healthz(request):
+    """For uptime monitors and the Docker healthcheck: 200 when the app and database answer, 503 otherwise."""
+    from django.db import connection
+    from django.http import JsonResponse
+    try:
+        with connection.cursor() as c:
+            c.execute("SELECT 1")
+        return JsonResponse({"status": "ok"})
+    except Exception:
+        return JsonResponse({"status": "database unavailable"}, status=503)

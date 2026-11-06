@@ -71,7 +71,7 @@ class LessonForm(StyledMixin, forms.ModelForm):
 class QuizForm(StyledMixin, forms.ModelForm):
     class Meta:
         model = Quiz
-        fields = ["title", "description", "lesson", "pass_percentage", "time_limit_minutes", "max_attempts", "is_published"]
+        fields = ["title", "description", "lesson", "pass_percentage", "time_limit_minutes", "max_attempts", "reveal_answers", "is_published"]
         widgets = {"description": forms.Textarea(attrs={"rows": 2})}
 
     def __init__(self, *args, course=None, **kwargs):

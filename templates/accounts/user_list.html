@@ -4,9 +4,9 @@
  <div><a class="btn btn-primary" href="{% url 'user_create' %}"><i class="bi bi-person-plus"></i> Create login</a> <a class="btn btn-warning" href="{% url 'bulk_generate' %}"><i class="bi bi-magic"></i> Auto-generate</a></div></div>
 <form class="row g-2 mb-3">
  <div class="col-md-3"><input class="form-control" name="q" placeholder="Search name, username, batch" value="{{ f.q }}"></div>
- {% if user.is_owner %}<div class="col-md-2"><select class="form-select" name="role"><option value="">All roles</option>{% for v,l in roles %}<option value="{{v}}" {% if f.role == v %}selected{% endif %}>{{l}}</option>{% endfor %}</select></div>{% endif %}
- <div class="col-md-2"><select class="form-select" name="type"><option value="">All student types</option>{% for v,l in types %}<option value="{{v}}" {% if f.type == v %}selected{% endif %}>{{l}}</option>{% endfor %}</select></div>
- <div class="col-md-3"><select class="form-select" name="school"><option value="">All schools</option>{% for s in schools %}<option value="{{s.pk}}" {% if f.school == s.pk|stringformat:"s" %}selected{% endif %}>{{s}}</option>{% endfor %}</select></div>
+ {% if user.is_owner %}<div class="col-md-2"><select class="form-select" name="role" aria-label="Filter by role"><option value="">All roles</option>{% for v,l in roles %}<option value="{{v}}" {% if f.role == v %}selected{% endif %}>{{l}}</option>{% endfor %}</select></div>{% endif %}
+ <div class="col-md-2"><select class="form-select" name="type" aria-label="Filter by student type"><option value="">All student types</option>{% for v,l in types %}<option value="{{v}}" {% if f.type == v %}selected{% endif %}>{{l}}</option>{% endfor %}</select></div>
+ <div class="col-md-3"><select class="form-select" name="school" aria-label="Filter by school"><option value="">All schools</option>{% for s in schools %}<option value="{{s.pk}}" {% if f.school == s.pk|stringformat:"s" %}selected{% endif %}>{{s}}</option>{% endfor %}</select></div>
  <div class="col-md-2"><button class="btn btn-outline-primary w-100">Filter</button></div>
 </form>
 <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">

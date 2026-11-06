@@ -4,19 +4,19 @@
  <a class="small" href="{{ course.get_absolute_url }}">← {{ course.title }}</a>
  <div class="card p-4 my-3"><div class="d-flex justify-content-between align-items-start"><div><h3 class="mb-1">{{ quiz.title }}</h3><p class="text-muted mb-0">{{ quiz.description }}</p>
   <div class="small text-muted mt-1">{{ questions|length }} questions · Pass mark {{ quiz.pass_percentage }}%{% if quiz.max_attempts %} · Attempt {{ attempts_used|add:1 }} of {{ quiz.max_attempts }}{% endif %}</div></div>
-  {% if quiz.time_limit_minutes %}<div class="text-center"><div class="small text-muted">Time left</div><div id="timer" class="fs-3 fw-bold font-monospace text-primary"></div></div>{% endif %}</div>
-  {% if not user.is_student %}<div class="alert alert-info small mt-3 mb-0">Preview mode – your answers will not be recorded.</div>{% endif %}</div>
+  {% if quiz.time_limit_minutes %}<div class="text-center" role="timer" aria-live="off"><div class="small text-muted">Time left</div><div id="timer" class="fs-3 fw-bold font-monospace text-primary"></div></div>{% endif %}</div>
+  {% if not user.is_student %}<div class="alert alert-info small mt-3 mb-0">Preview mode – your answers will not be recorded.</div>{% elif quiz.time_limit_minutes %}<div class="small text-muted mt-2"><i class="bi bi-clock"></i> The clock started when you opened this quiz and keeps running if you leave or refresh the page. Answers sent after the time is up score 0.</div>{% endif %}</div>
  <form method="post" id="quizform">{% csrf_token %}
   {% for q in questions %}<div class="card p-4 mb-3 quiz-q reveal" style="--i:{{ forloop.counter0 }}"><p class="fw-semibold mb-2">{{ forloop.counter }}. {{ q.text|linebreaksbr }} <span class="small text-muted fw-normal">({{ q.marks }} mark{{ q.marks|pluralize }}{% if q.multi %}, choose all that apply{% endif %})</span></p>
-   {% if q.image %}<img src="{{ q.image.url }}" class="img-fluid rounded mb-2" style="max-height:260px" alt="">{% endif %}
+   {% if q.image %}<img src="{{ q.image.url }}" class="img-fluid rounded mb-2" style="max-height:260px" alt="Picture for question {{ forloop.counter }}">{% endif %}
    {% for c in q.choices.all %}<label class="quiz-option" for="c{{ c.id }}"><input class="form-check-input" type="{% if q.multi %}checkbox{% else %}radio{% endif %}" name="q{{ q.id }}" value="{{ c.id }}" id="c{{ c.id }}"><span>{{ c.text }}</span></label>{% endfor %}
   </div>{% endfor %}
-  <button class="btn btn-primary btn-lg btn-glow w-100" onclick="return confirm('Submit your answers?')">Submit quiz</button>
+  <button class="btn btn-primary btn-lg btn-glow w-100" onclick="if(!confirm('Submit your answers?'))return false;this.disabled=true;this.form.submit()">Submit quiz</button>
  </form>
 </div></div>
 {% endblock %}
 {% block scripts %}{% if quiz.time_limit_minutes %}<script>
-(function(){var end=Date.now()+{{ quiz.time_limit_minutes }}*60000,el=document.getElementById('timer'),f=document.getElementById('quizform');
+(function(){var end=Date.now()+{{ remaining|default:0 }}*1000,el=document.getElementById('timer'),f=document.getElementById('quizform');
 function tick(){var s=Math.max(0,Math.round((end-Date.now())/1000));el.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 if(s<=60)el.classList.replace('text-primary','text-danger');if(s<=0){f.submit();return}setTimeout(tick,1000)}tick();})();
 </script>{% endif %}{% endblock %}

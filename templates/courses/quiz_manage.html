@@ -10,7 +10,7 @@
   {% for q in questions %}<div class="card p-3 mb-2 quiz-q"><div class="d-flex justify-content-between"><div><b>Q{{ forloop.counter }}.</b> {{ q.text|linebreaksbr }} <span class="badge text-bg-light">{{ q.marks }} mark{{ q.marks|pluralize }}</span></div>
    <div class="text-nowrap"><a class="btn btn-sm btn-light" href="?edit={{ q.pk }}#qform"><i class="bi bi-pencil"></i></a>
    <form method="post" class="d-inline">{% csrf_token %}<button name="delete_question" value="{{ q.pk }}" class="btn btn-sm btn-light text-danger" onclick="return confirm('Remove question?')"><i class="bi bi-trash"></i></button></form></div></div>
-   {% if q.image %}<img src="{{ q.image.url }}" class="img-fluid rounded my-2" style="max-height:160px" alt="">{% endif %}
+   {% if q.image %}<img src="{{ q.image.url }}" class="img-fluid rounded my-2" style="max-height:160px" alt="Picture for this question">{% endif %}
    <ul class="small mb-0 mt-1">{% for c in q.choices.all %}<li class="{% if c.is_correct %}text-success fw-bold{% endif %}">{{ c.text }}{% if c.is_correct %} ✓{% endif %}</li>{% endfor %}</ul></div>
   {% empty %}<div class="card p-4 text-muted">No questions yet – add the first one using the form.</div>{% endfor %}
   <h5 class="mt-4">Recent attempts</h5>

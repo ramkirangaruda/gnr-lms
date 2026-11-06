@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from accounts.forms import StyledMixin
 
 from .models import Course, Doubt, DoubtReply, Enrollment, Lesson
+from .validators import image_size
 
 
 def visible_doubts(user):
@@ -56,7 +57,7 @@ class AskForm(StyledMixin, forms.ModelForm):
 
 class ReplyForm(StyledMixin, forms.Form):
     body = forms.CharField(label="Your reply", widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Write a reply…"}))
-    image = forms.ImageField(required=False, label="Attach a photo")
+    image = forms.ImageField(required=False, label="Attach a photo", validators=[image_size])
     mark_resolved = forms.BooleanField(required=False, label="This solves the doubt – mark as resolved")
 
 

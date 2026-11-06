@@ -27,7 +27,7 @@ async function login(page, u) {
   const ids = { lesson: process.env.LESSON_ID, quiz: process.env.QUIZ_ID };
   for (const [role, [user, pages]] of Object.entries(roles)) {
     for (const dev of ['Desktop Chrome', 'Pixel 7', 'iPhone 13']) {
-      const ctx = await browser.newContext({ ...devices[dev], ...(dev === 'iPhone 13' ? { defaultBrowserType: undefined } : {}) });
+      const ctx = await browser.newContext({ ...devices[dev], reducedMotion: 'reduce' });  // no fade-in, so contrast is measured on the final colours
       const page = await ctx.newPage();
       page.on('console', m => { if (m.type() === 'error') out.console.push({ role, dev, url: page.url(), text: m.text() }); });
       page.on('pageerror', e => out.console.push({ role, dev, url: page.url(), text: 'pageerror: ' + e.message }));

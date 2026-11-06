@@ -5,7 +5,10 @@ import io
 import re
 import secrets
 
-from django.db import transaction
+import zlib
+
+from django.contrib.auth.hashers import make_password
+from django.db import connection, transaction
 from django.utils import timezone
 
 from .models import User
@@ -25,6 +28,19 @@ def username_prefix(student_type, school=None):
     return f"{code}{yy}"
 
 
+def set_temporary_password(user, password):
+    """Hash an auto-generated first password quickly (see accounts/hashers.py)."""
+    user.password = make_password(password, hasher="pbkdf2_temp")
+
+
+def lock_username_prefix(prefix):
+    """Two staff generating logins for the same school at once would pick the same next numbers; take turns.
+    Must be called inside a transaction (the lock is released at commit)."""
+    if connection.vendor == "postgresql":
+        with connection.cursor() as c:
+            c.execute("SELECT pg_advisory_xact_lock(%s)", [zlib.crc32(prefix.encode()) & 0x7FFFFFFF])
+
+
 def _next_seq(prefix):
     nums = [int(m.group(1)) for u in User.objects.filter(username__startswith=prefix).values_list("username", flat=True)
             if (m := re.fullmatch(re.escape(prefix) + r"(\d{4,})", u))]
@@ -37,6 +53,7 @@ def bulk_create_students(rows, student_type, school=None, grade="", batch="", co
     from courses.models import Enrollment
 
     prefix = username_prefix(student_type, school)
+    lock_username_prefix(prefix)
     seq = _next_seq(prefix)
     created, users = [], []
     for r in rows:
@@ -54,7 +71,7 @@ def bulk_create_students(rows, student_type, school=None, grade="", batch="", co
             school=school if student_type == User.StudentType.SCHOOL else None,
             must_change_password=True,
         )
-        u.set_password(password)
+        set_temporary_password(u, password)
         users.append(u)
         created.append((u, password))
         seq += 1

@@ -12,6 +12,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e10600'/%3E%3Ctext x='16' y='22' font-size='16' font-family='Arial' font-weight='700' fill='white' text-anchor='middle'%3EG%3C/text%3E%3C/svg%3E">
 </head>
 <body class="d-flex flex-column min-vh-100">
+<a class="visually-hidden-focusable position-absolute top-0 start-0 m-2 p-2 bg-white text-dark rounded shadow" style="z-index:2000" href="#main">Skip to main content</a>
 <nav class="navbar navbar-expand-lg navbar-dark gnr-nav sticky-top">
  <div class="container-fluid px-lg-4">
   <a class="navbar-brand" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'home' %}{% endif %}"><span class="brand-mark"><i class="bi bi-robot"></i></span><span>GNR <span class="brand-sub">Robotics</span></span></a>
@@ -58,8 +59,8 @@
   </div>
  </div>
 </nav>
-<main class="flex-grow-1 {% block main_class %}container py-4 py-lg-5{% endblock %}">
- {% if messages %}<div class="{% block msg_class %}{% endblock %}">{% for m in messages %}<div class="alert alert-{% if m.tags == 'error' %}danger{% else %}{{ m.tags|default:'info' }}{% endif %} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}</div>{% endif %}
+<main id="main" tabindex="-1" class="flex-grow-1 {% block main_class %}container py-4 py-lg-5{% endblock %}">
+ {% if messages %}<div class="{% block msg_class %}{% endblock %}">{% for m in messages %}<div class="alert alert-{% if m.tags == 'error' %}danger{% else %}{{ m.tags|default:'info' }}{% endif %} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}</div>{% endif %}
  {% block content %}{% endblock %}
 </main>
 <footer class="gnr-footer py-4 mt-5">

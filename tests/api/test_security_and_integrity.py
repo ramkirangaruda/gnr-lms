@@ -60,8 +60,8 @@ from accounts.models import User, School
 from django.contrib.auth.hashers import make_password
 s1=User.objects.get(username='lt0001'); s2=User.objects.get(username='lt0002')
 c_s1=Enrollment.objects.filter(student=s1).values_list('course_id',flat=True)
-other=Course.objects.exclude(pk__in=c_s1).first()
-mine=Course.objects.filter(pk__in=c_s1).first()
+other=Course.objects.exclude(pk__in=c_s1).filter(is_published=True, slug__startswith='qa-course').first()
+mine=Course.objects.filter(pk__in=c_s1, is_published=True, slug__startswith='qa-course').first()
 att2=QuizAttempt.objects.filter(student=s2).first() or QuizAttempt.objects.create(quiz=Course.objects.get(pk=Enrollment.objects.filter(student=s2).first().course_id).quizzes.first(),student=s2,score=1,total=10)
 cert2=Certificate.objects.filter(student=s2).first() or Certificate.objects.create(student=s2,title='x')
 pd=Doubt.objects.create(student=s2,course=mine if Enrollment.objects.filter(student=s2,course=mine).exists() else None,title='QA private {TAG}',body='secret',is_private=True)
@@ -131,10 +131,11 @@ unknown = s.post("/password/forgot/", {"email": "nobody_xyz@example.test"}, form
 check("SEC-RESET-1", "auth", "forgot-password does not reveal whether an account exists",
       known.status_code == unknown.status_code == 302 and known.headers.get("Location") == unknown.headers.get("Location"))
 shell("from django.core.cache import cache;from accounts.models import User;cache.delete(f'pwreset:{User.objects.get(username=\"lt0009\").pk}')")
+t_mail = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 1))
 for _ in range(5):
     s.post("/password/forgot/", {"email": "lt0009"}, form_page="/password/forgot/")
 time.sleep(1)
-logs = subprocess.run(["docker", "compose", "logs", "--since", "2m", "web"], cwd=REPO, capture_output=True, text=True).stdout
+logs = subprocess.run(["docker", "compose", "logs", "--since", t_mail, "web"], cwd=REPO, capture_output=True, text=True).stdout
 n_mails = logs.count("To: lt0009@example.test")
 check("SEC-RESET-2", "auth", "reset emails per account are capped (3/hour)", n_mails <= 3, f"emails sent={n_mails}")
 # only lt0009's own emails (earlier checks also mail lt0001; using that link would change the wrong password)
@@ -288,8 +289,10 @@ r = anon().get("/no-such-page-" + TAG)
 check("SEC-ERR-1", "config", "404 page is the friendly page, no debug traceback", r.status_code == 404 and "Traceback" not in r.text and "DEBUG" not in r.text)
 r = anon().get("/verify/not-a-uuid/")
 check("SEC-ERR-2", "config", "malformed certificate code gives 404, not 500", r.status_code == 404, r.status_code)
-check("SEC-ADM-1", "config", "Django admin login is not exposed at the default /admin/ path", anon().get("/admin/login/").status_code == 404,
-      "admin login page is public at /admin/login/ with no rate limit")
+_r = anon().get("/admin/login/")
+check("SEC-ADM-1", "config", "Django admin login goes through the throttled /login/ page (or is hidden)",
+      _r.status_code == 404 or (_r.status_code == 302 and _r.headers.get("Location", "").startswith("/login/")),
+      f"{_r.status_code} {_r.headers.get('Location', '')}")
 
 # ---------------------------------------------------------------- validation & unicode
 title = "రోబోటిక్స్ doubt हिंदी 🚀🤖 " + TAG
@@ -368,12 +371,17 @@ d=Doubt.objects.filter(student__username='lt0015').first() or Doubt.objects.crea
 DoubtReply.objects.create(doubt=d,author=i,body='answer from soon-deleted instructor')
 before=d.replies.count(); i.delete(); after=d.replies.count()
 s=User.objects.get(username='lt0016'); c=Certificate.objects.create(student=s,title='QA cascade'); code=str(c.code)
-s_copy=User.objects.create(username='qa_tmpstu_{TAG}',role='student',password='!'); c2=Certificate.objects.create(student=s_copy,title='QA cascade'); code2=str(c2.code); s_copy.delete()
-print(json.dumps(dict(replies_lost=before-after, cert_after_student_delete=Certificate.objects.filter(code=code2).exists(), code2=code2)))
+s_copy=User.objects.create(username='qa_tmpstu_{TAG}',role='student',password='!'); c2=Certificate.objects.create(student=s_copy,title='QA cascade'); code2=str(c2.code)
+try:
+    s_copy.delete(); blocked=False
+except Exception:
+    blocked=True
+print(json.dumps(dict(replies_lost=before-after, delete_blocked=blocked, cert_after_student_delete=Certificate.objects.filter(code=code2).exists(), code2=code2)))
 """))
 check("INT-7", "integrity", "deleting an instructor keeps their answers on students' doubts", res["replies_lost"] == 0, f"replies deleted={res['replies_lost']}")
 v = anon().get(f"/verify/{res['code2']}/")
-check("INT-8", "integrity", "deleting a student keeps their issued certificates verifiable", res["cert_after_student_delete"], "certificate rows cascade-deleted with the student")
+check("INT-8", "integrity", "deleting a student keeps their issued certificates verifiable",
+      res["cert_after_student_delete"] and v.status_code == 200, f"delete blocked={res['delete_blocked']} verify={v.status_code}")
 
 # ---------------------------------------------------------------- cleanup of objects that would distort later runs
 shell(f"""
@@ -382,6 +390,12 @@ from courses.models import Course
 User.objects.filter(username__startswith='qa_fresh_{TAG}').delete(); User.objects.filter(username='qa_esc_{TAG}').delete()
 Course.objects.filter(title__in=['🚀🤖','రోబోటిక్స్']).delete(); Course.objects.filter(title='QA unpublished {TAG}').delete()
 User.objects.filter(username='lt0001').update(role='student')
+from courses.models import Certificate
+Certificate.objects.filter(student__username__startswith='qa_tmpstu_').delete()
+from courses.models import Enrollment
+u14=User.objects.get(username='lt0014'); Enrollment.objects.filter(student=u14).delete()
+for k in range(3):
+    Enrollment.objects.get_or_create(student=u14, course=Course.objects.get(slug=f'qa-course-{(13 + k) % 10 + 1}')); User.objects.filter(username__startswith='qa_tmpstu_').delete()
 """)
 json.dump(RESULTS, open(os.path.join(os.path.dirname(__file__), "results.json"), "w"), indent=1, ensure_ascii=False)
 fails = [r for r in RESULTS if not r["pass"]]

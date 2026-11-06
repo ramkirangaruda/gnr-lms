@@ -12,4 +12,6 @@ RUN useradd --create-home --uid 1000 app && mkdir -p /app/media && chown -R app:
 USER app
 EXPOSE 8000
 # gthread workers handle many concurrent users well; tune WEB_CONCURRENCY to 2 x CPU cores + 1.
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-5} --threads 4 --worker-class gthread --timeout 120 --max-requests 2000 --max-requests-jitter 200 --access-logfile -"]
+# No --max-requests: recycling workers under load caused occasional 502s, and memory stayed flat in a 30-min soak.
+# --keep-alive 75 is longer than Caddy's 60 s, so Caddy always closes idle connections first.
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-5} --threads 4 --worker-class gthread --timeout 120 --keep-alive 75 --access-logfile -"]

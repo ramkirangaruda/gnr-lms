@@ -237,3 +237,7 @@ a{text-underline-offset:3px}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 
 @media print{nav,footer,.no-print{display:none!important}body{background:#fff}main{padding:0!important}.cert{box-shadow:none;width:100%;max-width:none}@page{size:A4 landscape;margin:8mm}}
+
+/* WCAG AA contrast for status text on light card backgrounds */
+.text-success{color:#067647!important}
+.text-danger{color:#b42318!important}

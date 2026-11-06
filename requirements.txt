@@ -1,7 +1,11 @@
-Django>=5.2,<6
-gunicorn>=23
-psycopg[binary]>=3.2
-whitenoise>=6.7
-Pillow>=10
-redis>=5
-django-storages[s3]>=1.14
+# Exact versions, so every rebuild installs what was tested (launch QA 2026-11-06, pip-audit clean).
+# To upgrade: change a version here, rebuild, run the tests in tests/README.md.
+Django==5.2.19
+gunicorn==26.2.0
+psycopg[binary]==3.3.8
+whitenoise==6.12.0
+Pillow==13.0.0
+redis==8.1.0
+django-storages[s3]==1.14.6
+boto3==1.43.125
+sentry-sdk==2.74.0

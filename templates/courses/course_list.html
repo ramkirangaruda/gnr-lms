@@ -8,7 +8,7 @@
 <div class="row g-3">
 {% for c in courses %}
  <div class="col-sm-6 col-lg-4 col-xl-3 reveal" style="--i:{{ forloop.counter0 }}"><div class="card card-hover course-card" data-rb="spotlight">
-  <a href="{{ c.get_absolute_url }}" class="thumb-wrap d-block">{% if c.thumbnail %}<img src="{{ c.thumbnail.url }}" class="course-thumb" alt="" loading="lazy">{% else %}<div class="thumb-placeholder"><i class="bi bi-cpu"></i></div>{% endif %}</a>
+  <a href="{{ c.get_absolute_url }}" class="thumb-wrap d-block" aria-label="{{ c.title }}" tabindex="-1">{% if c.thumbnail %}<img src="{{ c.thumbnail.url }}" class="course-thumb" alt="" loading="lazy">{% else %}<div class="thumb-placeholder"><i class="bi bi-cpu"></i></div>{% endif %}</a>
   <div class="card-body d-flex flex-column">
    <div class="small mb-1"><span class="badge text-bg-light">{{ c.get_level_display }}</span> {% if c.age_group %}<span class="badge text-bg-light">{{ c.age_group }}</span>{% endif %} {% if not c.is_published %}<span class="badge text-bg-warning">Draft</span>{% endif %}</div>
    <h6 class="card-title"><a class="text-decoration-none text-dark" href="{{ c.get_absolute_url }}">{{ c.title }}</a></h6>

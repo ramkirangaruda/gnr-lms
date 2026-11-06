@@ -43,7 +43,7 @@ docker compose exec web python manage.py setup_gnr --owner admin --password 'Cho
 ```
 
 This runs PostgreSQL, Redis, Django (gunicorn, 5 workers × 4 threads) and **Caddy**, which gets a free Let's Encrypt
-HTTPS certificate for `LMS_DOMAIN` by itself, redirects http to https, and serves uploaded files directly.
+HTTPS certificate for `LMS_DOMAIN` by itself, redirects http to https, and sends uploaded files once Django has checked the visitor may see them.
 Ports 80 and 443 must be open in the server's firewall. **Never run `setup_gnr --demo` on the live server**: it creates
 logins with publicly known passwords.
 
@@ -53,11 +53,27 @@ To try it on the bare IP before DNS is ready, set `LMS_DOMAIN=:80`, `SECURE_COOK
 **Updating:** `git pull && docker compose up -d --build` (migrations run automatically on start).
 **Logs:** `docker compose logs -f web` (errors include the full traceback).
 
-**Backups:** `sh deploy/backup.sh` writes a database dump and a copy of all uploads to `backups/` and keeps 14 days.
-Schedule it nightly with `crontab -e` (the line is at the top of the script) and copy `backups/` off the server
-regularly (for example with `rclone` to Google Drive or Backblaze B2), because a backup on the same server dies with it.
+**Backups:** `sh deploy/backup.sh` writes a database dump and the uploads (minus lesson MP4s) to `backups/` and keeps 7 days.
+Schedule it nightly with `crontab -e` (the line is at the top of the script). **Copy them off the server**, because a
+backup on the same server dies with it: install rclone (`sudo apt install rclone`), run `rclone config` once to add a
+remote (Backblaze B2 has 10 GB free; Google Drive works too), then put `BACKUP_REMOTE=<remote>:gnr-lms-backups` in `.env`.
+The script then uploads each night's files there. `sh tests/ops/backup_restore_check.sh` restores the latest backup into
+a throw-away database and compares row counts. Run it once on the real server.
 Restore (tested): `docker compose exec -T db pg_restore -U gnr -d gnr_lms --clean --if-exists < backups/db_<date>.dump`,
 then the uploads: `docker compose exec -T web sh -c 'tar -xzf - -C /app' < backups/media_<date>.tar.gz`.
+
+**Knowing when it breaks (set up before launch):**
+- Uptime: add `https://<your domain>/healthz` to a free monitor such as UptimeRobot or Better Stack. It answers 200
+  when the app and database work and 503 when the database is down, and the monitor emails or texts you.
+- Errors: set `SENTRY_DSN` in `.env` (free tier at sentry.io) for every server error with its traceback, and/or
+  `DJANGO_ADMINS=Your Name <you@example.com>` to get each error by email (needs the SMTP settings).
+- Container logs are capped at 5 × 10 MB per container, so they can't fill the disk.
+
+**Security settings you can tune in `.env`:** `LOGIN_FAILS_PER_USER` (default 10) and `LOGIN_FAILS_PER_IP` (default
+100, a whole school lab shares one IP) wrong passwords within `LOGIN_LOCKOUT_SECONDS` (default 900) make that account or
+IP wait. Passwords must be at least 8 characters, not only digits and not a common password. Uploaded files are only
+served to people allowed to see them (lesson files to the course's students and staff, private doubt photos to the
+student and staff); Caddy sends the bytes after Django checks.
 
 **Videos:** the best option is **Bunny Stream** (below): instructors upload from the lesson form and students get adaptive streaming that only enrolled users can play. Unlisted YouTube or Vimeo links still work and cost nothing. Uploaded MP4s work too, but they use your server's bandwidth.
 

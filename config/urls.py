@@ -1,21 +1,25 @@
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.urls import path, re_path
 
 from accounts import views as a
 from courses import doubts as dq
 from courses import views as c
 from portal import views as p
+from portal.media import serve_media
+from portal.views import healthz
 
 urlpatterns = [
+    # The admin uses the same throttled login page as everyone else.
+    path("admin/login/", a.admin_login),
     path("admin/", admin.site.urls),
     path("", p.home, name="home"),
+    path("healthz", healthz, name="healthz"),
     path("dashboard/", p.dashboard, name="dashboard"),
 
     # auth
-    path("login/", auth_views.LoginView.as_view(template_name="accounts/login.html", redirect_authenticated_user=True), name="login"),
+    path("login/", a.ThrottledLoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("password/", auth_views.PasswordChangeView.as_view(template_name="accounts/password_change.html",
                                                              success_url="/dashboard/"), name="password_change"),
@@ -84,8 +88,8 @@ urlpatterns = [
     path("competitions/<int:pk>/edit/", p.competition_form, name="competition_edit"),
 ]
 
-if settings.DEBUG or settings.STORAGES["default"]["BACKEND"].endswith("FileSystemStorage"):
-    # In production Caddy serves /media/ directly; this is a fallback.
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if settings.STORAGES["default"]["BACKEND"].endswith("FileSystemStorage"):
+    # Uploaded files are permission-checked here (portal/media.py); Caddy then sends the bytes.
+    urlpatterns += [re_path(r"^media/(?P<path>.+)$", serve_media, name="media")]
 
 admin.site.site_header = "GNR Robotics LMS – Admin"

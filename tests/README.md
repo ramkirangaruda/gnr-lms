@@ -24,7 +24,7 @@ the other CPUs of the test machine (`taskset -c 2,3 k6 ...`).
 
 | Command | What it checks |
 |---|---|
-| `docker compose exec -T web python manage.py test` | 37 unit/integration tests |
+| `docker compose exec -T web python manage.py test` | 56 unit/integration + regression tests |
 | `python3 tests/e2e/make_fixtures.py && node tests/e2e/walkthrough.js` | 57 browser checks: every role's journey, crawls of every linked page |
 | `python3 tests/api/test_security_and_integrity.py` | 70 checks: auth, access control/IDOR, XSS/CSRF/SQLi, uploads, headers, races, cascades |
 | `AXE_PATH=.../axe.min.js node tests/e2e/a11y_and_devices.js` | axe-core WCAG A/AA, console errors, phone layouts, slow 3G |

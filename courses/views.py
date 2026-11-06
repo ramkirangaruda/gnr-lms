@@ -16,17 +16,15 @@ from . import bunny
 from .doubts import visible_doubts
 from .forms import CertificateForm, CourseForm, EnrollForm, LessonForm, QuestionForm, QuizForm, parse_usernames
 from .models import (Certificate, Choice, Course, Enrollment, Lesson, LessonProgress, Question,
-                     Quiz, QuizAttempt)
+                     Quiz, QuizAttempt, QuizStart)
 
 
 # ---------- helpers ----------
 
 def _get_course_for_view(request, slug):
     course = get_object_or_404(Course, slug=slug)
-    u = request.user
-    if u.is_student:
-        if not course.is_published or not Enrollment.objects.filter(student=u, course=course).exists():
-            raise PermissionDenied("You are not enrolled in this course.")
+    if not course.can_view(request.user):
+        raise PermissionDenied("You are not enrolled in this course.")
     return course
 
 
@@ -79,6 +77,8 @@ def course_list(request):
     qs = Course.objects.annotate(n_lessons=Count("lessons", distinct=True), n_students=Count("enrollments", distinct=True))
     if u.is_student:
         qs = qs.filter(is_published=True, enrollments__student=u)
+    elif u.is_school_admin:
+        qs = qs.filter(pk__in=Enrollment.objects.filter(student__school_id=u.school_id).values("course_id"))
     q = request.GET.get("q", "").strip()
     if q:
         qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
@@ -286,13 +286,16 @@ def quiz_manage(request, slug, pk):
                                                         "form": form, "edit_q": edit_q, "attempts": attempts})
 
 
+QUIZ_GRACE_SECONDS = 30  # allowance for slow networks when the timer auto-submits
+
+
 @login_required
 def quiz_take(request, slug, pk):
     course = _get_course_for_view(request, slug)
     quiz = get_object_or_404(Quiz, pk=pk, course=course)
     u = request.user
-    if not quiz.is_published and not course.can_manage(u):
-        raise PermissionDenied
+    if (not quiz.is_published or u.is_school_admin) and not course.can_manage(u):
+        raise PermissionDenied  # school admins see results in reports, not the questions
     questions = list(quiz.questions.prefetch_related(Prefetch("choices", queryset=Choice.objects.order_by("?"))))
     past = QuizAttempt.objects.filter(quiz=quiz, student=u) if u.is_student else QuizAttempt.objects.none()
     if u.is_student and quiz.max_attempts and past.count() >= quiz.max_attempts:
@@ -302,35 +305,84 @@ def quiz_take(request, slug, pk):
         if not u.is_student:
             messages.info(request, "Preview only – staff answers are not recorded.")
             return redirect("quiz_manage", slug=slug, pk=pk)
-        score = total = 0
-        answers = {}
-        for q in questions:
-            picked = {int(x) for x in request.POST.getlist(f"q{q.id}") if x.isdigit()}
-            correct = {c.id for c in q.choices.all() if c.is_correct}
-            answers[str(q.id)] = sorted(picked)
-            total += q.marks
-            if picked and picked == correct:
-                score += q.marks
-        attempt = QuizAttempt.objects.create(quiz=quiz, student=u, score=score, total=total, answers=answers)
+        with transaction.atomic():
+            # Lock this student's start row: a double-click or parallel submits queue here, and only the first one
+            # finds the row, so max_attempts can't be exceeded and one opening of the quiz gives one attempt.
+            start = QuizStart.objects.select_for_update().filter(quiz=quiz, student=u).first()
+            if start is None:
+                messages.info(request, "Your answers for this quiz were already submitted.")
+                last = past.first()
+                return redirect("quiz_result", slug=slug, pk=pk, attempt=last.pk) if last else redirect("quiz_take", slug=slug, pk=pk)
+            if quiz.max_attempts and past.count() >= quiz.max_attempts:
+                start.delete()
+                return redirect("quiz_result", slug=slug, pk=pk, attempt=past.first().pk)
+            elapsed = (timezone.now() - start.started_at).total_seconds()
+            late = bool(quiz.time_limit_minutes) and elapsed > quiz.time_limit_minutes * 60 + QUIZ_GRACE_SECONDS
+            score = total = 0
+            answers = {}
+            for q in questions:
+                picked = {int(x) for x in request.POST.getlist(f"q{q.id}") if x.isdigit()}
+                correct = {c.id for c in q.choices.all() if c.is_correct}
+                answers[str(q.id)] = sorted(picked)
+                total += q.marks
+                if picked and picked == correct:
+                    score += q.marks
+            attempt = QuizAttempt.objects.create(quiz=quiz, student=u, score=0 if late else score, total=total,
+                                                 answers=answers, started_at=start.started_at, is_late=late)
+            start.delete()
+        if late:
+            messages.warning(request, f"Time was up {round((elapsed - quiz.time_limit_minutes * 60) / 60)} min before you "
+                                      "submitted, so this attempt scores 0.")
         return redirect("quiz_result", slug=slug, pk=pk, attempt=attempt.pk)
+    remaining = None
+    if u.is_student:
+        start, _ = QuizStart.objects.get_or_create(quiz=quiz, student=u)
+        limit = quiz.time_limit_minutes * 60
+        if limit and (timezone.now() - start.started_at).total_seconds() > limit + QUIZ_GRACE_SECONDS:
+            # Opened earlier and never submitted before time ran out: that attempt counts, with no answers.
+            QuizAttempt.objects.create(quiz=quiz, student=u, score=0, total=sum(q.marks for q in questions),
+                                       answers={}, started_at=start.started_at, is_late=True)
+            start.delete()
+            messages.warning(request, "Your last attempt at this quiz ran out of time without being submitted, so it scored 0.")
+            return redirect("quiz_take", slug=slug, pk=pk)
+        if quiz.time_limit_minutes:
+            remaining = max(0, int(quiz.time_limit_minutes * 60 - (timezone.now() - start.started_at).total_seconds()))
+    elif quiz.time_limit_minutes:
+        remaining = quiz.time_limit_minutes * 60
     for q in questions:
         q.multi = sum(1 for c in q.choices.all() if c.is_correct) > 1
     return render(request, "courses/quiz_take.html", {"course": course, "quiz": quiz, "questions": questions,
-                                                      "attempts_used": past.count()})
+                                                      "attempts_used": past.count(), "remaining": remaining})
+
+
+def can_see_answers(user, attempt):
+    """Staff always; students depending on the quiz's 'Show correct answers' setting."""
+    quiz = attempt.quiz
+    if not user.is_student:
+        return True
+    if quiz.reveal_answers == Quiz.Reveal.ALWAYS:
+        return True
+    if quiz.reveal_answers == Quiz.Reveal.NEVER:
+        return False
+    mine = QuizAttempt.objects.filter(quiz=quiz, student=attempt.student)
+    used_all = bool(quiz.max_attempts) and mine.count() >= quiz.max_attempts
+    return used_all or any(a.passed for a in mine)
 
 
 @login_required
 def quiz_result(request, slug, pk, attempt):
     course = _get_course_for_view(request, slug)
-    a = get_object_or_404(QuizAttempt, pk=attempt, quiz_id=pk, quiz__course=course)
+    a = get_object_or_404(QuizAttempt.objects.select_related("quiz"), pk=attempt, quiz_id=pk, quiz__course=course)
     if not can_view_student(request.user, a.student):
         raise PermissionDenied
+    show = can_see_answers(request.user, a)
     questions = list(a.quiz.questions.prefetch_related("choices"))
     for q in questions:
         q.picked = set(a.answers.get(str(q.id), []))
-        q.correct_ids = {c.id for c in q.choices.all() if c.is_correct}
-        q.is_right = bool(q.picked) and q.picked == q.correct_ids
-    return render(request, "courses/quiz_result.html", {"course": course, "attempt": a, "questions": questions})
+        q.correct_ids = {c.id for c in q.choices.all() if c.is_correct} if show else set()
+        q.is_right = show and bool(q.picked) and q.picked == q.correct_ids
+    return render(request, "courses/quiz_result.html", {"course": course, "attempt": a, "questions": questions,
+                                                        "show_answers": show})
 
 
 # ---------- enrollment & reports ----------
@@ -483,11 +535,17 @@ def certificate_view(request, code):
     cert = get_object_or_404(Certificate.objects.select_related("student", "course", "issued_by", "student__school"), code=code)
     if not (can_view_student(request.user, cert.student)):
         raise PermissionDenied
-    if request.method == "POST" and request.user.is_staff_member and "revoke" in request.POST:
+    u = request.user
+    # Owners can revoke anything; instructors only certificates they issued or for courses they teach.
+    can_revoke = u.is_owner or (u.is_instructor and (cert.issued_by_id == u.id or (cert.course and cert.course.can_manage(u))))
+    if request.method == "POST" and "revoke" in request.POST:
+        if not can_revoke:
+            raise PermissionDenied
         cert.delete()
         messages.success(request, "Certificate revoked.")
         return redirect("certificate_list")
-    return render(request, "courses/certificate.html", {"c": cert, "verify_url": request.build_absolute_uri(f"/verify/{cert.code}/")})
+    return render(request, "courses/certificate.html", {"c": cert, "can_revoke": can_revoke,
+                                                        "verify_url": request.build_absolute_uri(f"/verify/{cert.code}/")})
 
 
 def certificate_verify(request, code):

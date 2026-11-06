@@ -1,8 +1,15 @@
 # One-server production setup: PostgreSQL + Redis + Django (gunicorn) + Caddy (automatic HTTPS).
 # Start with:  docker compose up -d --build
+
+# Keep container logs from filling the disk: at most 5 x 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "5"}
+
 services:
   db:
     image: postgres:16-alpine
+    logging: *logging
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -16,21 +23,32 @@ services:
       retries: 10
   redis:
     image: redis:7-alpine
+    logging: *logging
     restart: unless-stopped
   web:
     build: .
+    logging: *logging
     restart: unless-stopped
     env_file: .env   # includes BUNNY_STREAM_* (lesson videos) and EMAIL_* (password reset emails) keys, see README
     environment:
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       MEDIA_ROOT: /app/media
+      MEDIA_ACCEL_REDIRECT: "1"   # Caddy sends uploaded files after Django checks permission
+    healthcheck:
+      # sends the real hostname, because Django rejects Host headers that aren't in DJANGO_ALLOWED_HOSTS
+      test: ["CMD", "python", "-c", "import os,sys,urllib.request as u; h=os.environ['DJANGO_ALLOWED_HOSTS'].split(',')[0].strip(); sys.exit(0 if u.urlopen(u.Request('http://127.0.0.1:8000/healthz', headers={'Host': h, 'X-Forwarded-Proto': 'https'}), timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     volumes: [media:/app/media]
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_started}
   caddy:
     image: caddy:2.10-alpine
+    logging: *logging
     restart: unless-stopped
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:

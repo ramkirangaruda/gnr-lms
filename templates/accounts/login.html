@@ -14,10 +14,12 @@
    <div class="eyebrow mb-2">Welcome back</div>
    <h2 class="mb-4">Log in to your account</h2>
    <form method="post">{% csrf_token %}
-    {% if form.errors %}<div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-circle"></i> Wrong username or password. Please try again.</div>{% endif %}
-    <div class="mb-3"><label class="form-label fw-semibold">Username</label><input name="username" class="form-control form-control-lg" autofocus autocapitalize="none" autocomplete="username" required value="{{ form.username.value|default:'' }}" placeholder="e.g. gnr260001"></div>
-    <div class="mb-4"><div class="d-flex justify-content-between align-items-baseline"><label class="form-label fw-semibold">Password</label><a class="small" href="{% url 'password_reset' %}">Forgot password?</a></div>
+    {% if locked %}<div class="alert alert-warning py-2 small" role="alert"><i class="bi bi-hourglass-split"></i> Too many wrong passwords. Please wait {{ lockout_minutes }} minutes and try again, or ask your instructor to reset your password.</div>
+    {% elif form.errors %}<div class="alert alert-danger py-2 small" role="alert"><i class="bi bi-exclamation-circle"></i> Wrong username or password. Please try again.</div>{% endif %}
+    <div class="mb-3"><label class="form-label fw-semibold" for="id_username">Username</label><input name="username" id="id_username" class="form-control form-control-lg" autofocus autocapitalize="none" autocomplete="username" required value="{{ form.username.value|default:'' }}" placeholder="e.g. gnr260001"></div>
+    <div class="mb-4"><div class="d-flex justify-content-between align-items-baseline"><label class="form-label fw-semibold" for="pw">Password</label><a class="small" href="{% url 'password_reset' %}">Forgot password?</a></div>
      <div class="input-group"><input type="password" name="password" id="pw" class="form-control form-control-lg" autocomplete="current-password" required><button type="button" class="btn btn-light border" onclick="pw.type=pw.type==='password'?'text':'password';this.firstChild.classList.toggle('bi-eye-slash')" aria-label="Show password"><i class="bi bi-eye"></i></button></div></div>
+    <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="remember" value="1" id="remember"><label class="form-check-label small" for="remember">Keep me signed in on this device (not on a shared school computer)</label></div>
     <input type="hidden" name="next" value="{{ next }}">
     <button class="btn btn-primary btn-lg w-100 btn-glow">Log in <i class="bi bi-arrow-right"></i></button>
    </form>
