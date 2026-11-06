@@ -20,6 +20,12 @@ urlpatterns = [
     path("password/", auth_views.PasswordChangeView.as_view(template_name="accounts/password_change.html",
                                                              success_url="/dashboard/"), name="password_change"),
     path("welcome/password/", a.first_password, name="first_password"),
+    path("password/forgot/", a.ForgotPasswordView.as_view(), name="password_reset"),
+    path("password/forgot/sent/", auth_views.PasswordResetDoneView.as_view(
+        template_name="registration/password_reset_done.html"), name="password_reset_done"),
+    path("password/reset/<uidb64>/<token>/", a.ResetConfirmView.as_view(), name="password_reset_confirm"),
+    path("password/reset/done/", auth_views.PasswordResetCompleteView.as_view(
+        template_name="registration/password_reset_complete.html"), name="password_reset_complete"),
 
     # people
     path("users/", a.user_list, name="user_list"),

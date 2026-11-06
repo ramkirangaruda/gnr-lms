@@ -1,9 +1,16 @@
 import csv
 import io
+import logging
 
 from django import forms
+from django.conf import settings
+from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
+from django.core.cache import cache
+from django.db.models import Q
 
 from .models import School, User
+
+logger = logging.getLogger(__name__)
 
 
 class StyledMixin:
@@ -121,3 +128,45 @@ class ForcedPasswordChangeForm(StyledMixin, forms.Form):
         if d.get("new_password1") != d.get("new_password2"):
             raise forms.ValidationError("Passwords do not match.")
         return d
+
+
+class ResetRequestForm(StyledMixin, PasswordResetForm):
+    """'Forgot password' by username OR email. Only accounts that have an email address can be reset this way;
+    students without one are reset by their instructor or school coordinator. The page never says which it was,
+    so it can't be used to find out who has an account."""
+    email = forms.CharField(label="Username or email", max_length=254,
+                            widget=forms.TextInput(attrs={"autocomplete": "username", "autocapitalize": "none",
+                                                          "autofocus": True}))
+
+    def get_users(self, value):
+        value = value.strip()
+        if not value:
+            return []
+        qs = User._default_manager.filter(is_active=True).exclude(email="").filter(
+            Q(username__iexact=value) | Q(email__iexact=value))
+        limit = settings.PASSWORD_RESET_EMAILS_PER_HOUR
+        users = []
+        for u in qs:
+            if not u.has_usable_password():
+                continue
+            key = f"pwreset:{u.pk}"
+            cache.add(key, 0, 3600)
+            if cache.incr(key) > limit:
+                logger.warning("Password reset email limit reached for user %s", u.pk)
+                continue
+            users.append(u)
+        return users
+
+    def send_mail(self, *args, **kwargs):
+        # An SMTP outage should not show the visitor an error page; it goes to the log instead.
+        try:
+            super().send_mail(*args, **kwargs)
+        except Exception:
+            logger.exception("Could not send password reset email")
+
+
+class ResetSetPasswordForm(StyledMixin, SetPasswordForm):
+    """Setting a password from an emailed link counts as choosing your own password."""
+    def save(self, commit=True):
+        self.user.must_change_password = False
+        return super().save(commit)

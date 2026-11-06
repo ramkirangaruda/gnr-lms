@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import views as auth_views
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -6,7 +8,8 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import BulkGenerateForm, ForcedPasswordChangeForm, SchoolForm, UserCreateForm, UserEditForm
+from .forms import (BulkGenerateForm, ForcedPasswordChangeForm, ResetRequestForm, ResetSetPasswordForm, SchoolForm,
+                    UserCreateForm, UserEditForm)
 from .models import School, User
 from .permissions import manager_required, owner_required, visible_students
 from .services import bulk_create_students, credentials_csv_data_uri, random_password, username_prefix, _next_seq
@@ -157,3 +160,24 @@ def first_password(request):
     return render(request, "accounts/user_form.html", {
         "form": form, "title": "Set your new password",
         "intro": "For your security, please choose a new password before continuing."})
+
+
+class ForgotPasswordView(auth_views.PasswordResetView):
+    """Self-service reset for accounts with an email. When email isn't set up, the page just explains who to ask."""
+    template_name = "registration/password_reset_form.html"
+    email_template_name = "registration/password_reset_email.txt"
+    subject_template_name = "registration/password_reset_subject.txt"
+    form_class = ResetRequestForm
+
+    def dispatch(self, request, *args, **kwargs):
+        if not settings.PASSWORD_RESET_BY_EMAIL and request.method == "POST":
+            return redirect("password_reset")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(email_enabled=settings.PASSWORD_RESET_BY_EMAIL, **kwargs)
+
+
+class ResetConfirmView(auth_views.PasswordResetConfirmView):
+    template_name = "registration/password_reset_confirm.html"
+    form_class = ResetSetPasswordForm

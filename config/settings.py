@@ -152,7 +152,25 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
-EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+# ---- Email (only used for "Forgot password?" links) ----
+# With no EMAIL_HOST, emails are printed to the console/log instead of sent (fine for local development).
+# See README → "Email for password resets" for cheap SMTP providers.
+EMAIL_HOST = env("EMAIL_HOST", "")
+EMAIL_PORT = int(env("EMAIL_PORT", 587))
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)   # STARTTLS on port 587
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)  # implicit TLS on port 465 (set EMAIL_USE_TLS=0 then)
+EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", 15))
+EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend" if EMAIL_HOST
+                    else "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "GNR Robotics LMS <no-reply@localhost>")
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Self-service reset by email is offered when SMTP is configured (always in DEBUG, where mail goes to the console).
+# Users without an email address are always reset by their instructor / school coordinator instead.
+PASSWORD_RESET_BY_EMAIL = env_bool("PASSWORD_RESET_BY_EMAIL", bool(EMAIL_HOST) or DEBUG)
+PASSWORD_RESET_TIMEOUT = int(env("PASSWORD_RESET_TIMEOUT", 24 * 3600))  # reset links expire after 1 day
+PASSWORD_RESET_EMAILS_PER_HOUR = int(env("PASSWORD_RESET_EMAILS_PER_HOUR", 3))  # per account, stops mailbox spam
 
 # Bunny Stream lesson videos (optional). Leave empty to hide the "Upload to Bunny" option.
 # Library ID + API key: Bunny dashboard → Stream → your library → API. Token key: Security → Embed view token authentication.

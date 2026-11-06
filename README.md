@@ -7,7 +7,7 @@ Learning platform for GNR Robotics: owners, instructors, partner schools, and in
 | Area | What it does |
 |---|---|
 | **Roles** | **Owner** (everything), **Instructor** (courses, quizzes, doubts, certificates, student logins), **School Admin** (sees only their own school's students and progress, can create logins for them), **Student** (in-house or school) |
-| **Logins** | Create single logins; **auto-generate** hundreds of student accounts from a count or a CSV (usernames like `dps260001`, `gnr260001` for in-house); download the credentials as CSV or print slips; students must set their own password on first login; password reset by staff |
+| **Logins** | Create single logins; **auto-generate** hundreds of student accounts from a count or a CSV (usernames like `dps260001`, `gnr260001` for in-house); download the credentials as CSV or print slips; students must set their own password on first login; password reset by staff (no email needed) or "Forgot password?" by email |
 | **Courses** | Create, edit and delete courses; lessons with **Bunny Stream** uploads, YouTube/Vimeo links **or** uploaded MP4s, notes and downloadable material; draft/publish; enrol a whole school, grade, batch, all in-house students, or a list of usernames |
 | **Quizzes** | Single- and multi-answer questions with images, marks, pass %, timer with auto-submit, attempt limits, answer review after submission |
 | **Doubts** | Q&A hub: students ask from anywhere (course, lesson or general), pick a topic (code, circuit, kit…), attach photos, paste code between ``` marks, and can keep a doubt private. While typing, similar answered doubts are suggested. A **Community** tab shows classmates' answered doubts. "I have this doubt too" votes push common doubts to the top of the instructors' **Needs an answer** queue. Students can mark the best answer; replying again reopens a doubt. A badge in the nav shows the queue size / new answers. |
@@ -85,6 +85,46 @@ Instructors pick a video file on the lesson form; it uploads straight from their
 **Using it:** open a lesson → **Edit lesson** → **Upload lesson video**, choose the file, wait for 100%, then **Save**. Bunny needs a few minutes to encode before the video plays. Uploading a new video replaces (and deletes) the old one; tick **Remove the Bunny Stream video** to go back to a YouTube link. Deleting a lesson or course also deletes its Bunny videos.
 
 Only owners and the course's own instructors can upload. If the Bunny variables are empty, the upload box simply doesn't appear and everything else works as before.
+
+## Forgotten passwords
+
+There are two ways to get back into an account:
+
+- **Staff reset (works with no email at all).** On **Logins**, click the key icon next to a user (or **Reset password** on
+  their edit page). The LMS shows a new temporary password to print or download, and the user must choose their own
+  password the next time they log in. Owners can reset anyone; instructors and school coordinators can reset the
+  students they manage. Bulk-generated students don't need an email address for this.
+- **"Forgot password?" by email.** The login page links to `/password/forgot/`. A user enters their username or email,
+  and if the account has an email address they get a one-time link (valid 24 hours). Several students can share one
+  parent's email; each gets their own email naming the username. Add emails with the `email` column of the
+  auto-generate CSV or on a user's edit page. Accounts without an email get nothing, and the page tells them to ask
+  their instructor. At most 3 reset emails per account per hour.
+
+If the owner is locked out: `docker compose exec web python manage.py changepassword admin`.
+
+### Email for password resets
+
+Put your SMTP details in `.env` and restart (`docker compose up -d`). Until `EMAIL_HOST` is set, the forgot-password page
+only says "ask your instructor" (and locally, in DEBUG, emails are printed in the `runserver` console).
+
+```
+EMAIL_HOST=smtp-relay.brevo.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=...
+EMAIL_HOST_PASSWORD=...
+EMAIL_USE_TLS=1
+DEFAULT_FROM_EMAIL=GNR Robotics LMS <no-reply@gnrrobotics.com>
+```
+
+Cheap options (password resets are a handful of emails a day):
+
+| Provider | Cost | Notes |
+|---|---|---|
+| **Brevo** (recommended) | Free, 300 emails/day | Sign up, verify your domain (adds DKIM/SPF DNS records) so mail doesn't land in spam, then *SMTP & API → SMTP* gives the login and key. Host `smtp-relay.brevo.com`, port 587. |
+| Gmail / Google Workspace | Free with the account | Turn on 2-step verification, create an **App password**, use host `smtp.gmail.com`, port 587, your address as user. About 500/day on a normal Gmail; mail comes from that Gmail address. Good for testing. |
+| Amazon SES | About $0.10 per 1,000 emails | Cheapest at large volume, but you must verify the domain and request to leave the "sandbox" first. Host `email-smtp.<region>.amazonaws.com`, SMTP credentials from the SES console. |
+
+Check it works: `docker compose exec web python manage.py sendtestemail you@example.com`
 
 ## Scaling up later (AWS)
 
