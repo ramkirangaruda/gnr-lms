@@ -56,7 +56,8 @@ To try it on the bare IP before DNS is ready, set `LMS_DOMAIN=:80`, `SECURE_COOK
 **Backups:** `sh deploy/backup.sh` writes a database dump and a copy of all uploads to `backups/` and keeps 14 days.
 Schedule it nightly with `crontab -e` (the line is at the top of the script) and copy `backups/` off the server
 regularly (for example with `rclone` to Google Drive or Backblaze B2), because a backup on the same server dies with it.
-Restore: `docker compose exec -T db pg_restore -U gnr -d gnr_lms --clean < backups/db_<date>.dump`.
+Restore (tested): `docker compose exec -T db pg_restore -U gnr -d gnr_lms --clean --if-exists < backups/db_<date>.dump`,
+then the uploads: `docker compose exec -T web sh -c 'tar -xzf - -C /app' < backups/media_<date>.tar.gz`.
 
 **Videos:** prefer **unlisted YouTube or Vimeo links**. They cost nothing in bandwidth and stream smoothly to every student at once. Uploaded MP4s work too, but they use your server's bandwidth.
 
