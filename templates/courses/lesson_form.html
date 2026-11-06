@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% load static %}{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-8"><div class="card p-4">
+ <a class="small" href="{{ course.get_absolute_url }}">← {{ course.title }}</a>
+ <h4 class="mb-3">{{ title }}</h4>
+ <form method="post" enctype="multipart/form-data" id="lesson-form">{% csrf_token %}
+  {% if bunny_enabled %}
+  <div class="border rounded p-3 mb-3" id="bunny-box" data-url="{% url 'lesson_bunny_upload' course.slug %}">
+   <label class="form-label fw-semibold" for="bunny-file"><i class="bi bi-cloud-arrow-up"></i> Upload lesson video (recommended)</label>
+   {% if lesson.bunny_video_id %}<div class="small text-success mb-2"><i class="bi bi-check2-circle"></i> This lesson already has a streamed video. Uploading a new one replaces it.</div>{% endif %}
+   <input class="form-control" type="file" id="bunny-file" accept="video/*">
+   <div class="form-text">Streams smoothly to every student, with no load on our server. Large files are fine; the upload resumes if your connection drops.</div>
+   <div class="progress mt-2 d-none" id="bunny-progress" role="progressbar" aria-label="Upload progress"><div class="progress-bar" style="width:0%">0%</div></div>
+   <div class="small mt-2" id="bunny-status" aria-live="polite"></div>
+  </div>
+  {% endif %}
+  {% include "_form.html" %}
+  <div class="d-flex justify-content-between"><div><button class="btn btn-primary" id="lesson-save">Save</button> <a class="btn btn-link" href="{{ back }}">Cancel</a></div></div>
+ </form>
+ <p class="small text-muted mt-3 mb-0">{% if bunny_enabled %}Use one video source per lesson. If several are set, students see the uploaded stream first, then an MP4 file, then the YouTube/Vimeo link.{% else %}Large video uploads may take a few minutes – keep this tab open until the page reloads.{% endif %}</p>
+</div></div></div>
+{% endblock %}
+{% block scripts %}{% if bunny_enabled %}
+<script src="{% static 'vendor/tus/tus.min.js' %}"></script>
+<script>
+(function () {
+  var box = document.getElementById("bunny-box"), input = document.getElementById("bunny-file");
+  var form = document.getElementById("lesson-form"), save = document.getElementById("lesson-save");
+  var bar = document.querySelector("#bunny-progress .progress-bar"), wrap = document.getElementById("bunny-progress");
+  var status = document.getElementById("bunny-status"), tokenField = form.querySelector("[name=bunny_upload_token]");
+  var uploading = null;
+  function say(msg, cls) { status.className = "small mt-2 " + (cls || ""); status.textContent = msg; }
+  function setPct(p) { bar.style.width = p + "%"; bar.textContent = p + "%"; }
+  window.addEventListener("beforeunload", function (e) { if (uploading) { e.preventDefault(); e.returnValue = ""; } });
+  form.addEventListener("submit", function (e) {
+    if (uploading) { e.preventDefault(); say("Please wait until the video upload finishes.", "text-danger"); }
+  });
+  input.addEventListener("change", function () {
+    var file = input.files[0];
+    if (!file) return;
+    if (uploading) uploading.abort();
+    tokenField.value = ""; save.disabled = true; wrap.classList.remove("d-none"); setPct(0);
+    say("Preparing upload…");
+    var body = new FormData();
+    body.append("title", (form.querySelector("[name=title]").value || file.name).trim());
+    fetch(box.dataset.url, { method: "POST", body: body, credentials: "same-origin",
+      headers: { "X-CSRFToken": form.querySelector("[name=csrfmiddlewaretoken]").value } })
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Upload could not start."); return d; }); })
+      .then(function (c) {
+        uploading = new tus.Upload(file, {
+          endpoint: c.endpoint,
+          retryDelays: [0, 3000, 5000, 10000, 20000, 60000],
+          chunkSize: 50 * 1024 * 1024,
+          headers: { AuthorizationSignature: c.signature, AuthorizationExpire: String(c.expires),
+                     VideoId: c.video_id, LibraryId: c.library_id },
+          metadata: { filetype: file.type, title: file.name },
+          onProgress: function (sent, total) { setPct(Math.floor(sent * 100 / total)); say("Uploading… keep this tab open."); },
+          onError: function (err) { uploading = null; save.disabled = false; wrap.classList.add("d-none"); say("Upload failed: " + err.message, "text-danger"); },
+          onSuccess: function () {
+            uploading = null; tokenField.value = c.token; save.disabled = false; setPct(100);
+            say("Uploaded. Click Save to attach it to the lesson. Bunny takes a few minutes to prepare the video for playback.", "text-success");
+          }
+        });
+        uploading.start();
+      })
+      .catch(function (err) { save.disabled = false; wrap.classList.add("d-none"); say(err.message, "text-danger"); });
+  });
+})();
+</script>
+{% endif %}{% endblock %}

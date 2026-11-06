@@ -141,3 +141,11 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+
+# Bunny Stream lesson videos (optional). Leave empty to hide the "Upload to Bunny" option.
+# Library ID + API key: Bunny dashboard → Stream → your library → API. Token key: Security → Embed view token authentication.
+BUNNY_STREAM_LIBRARY_ID = env("BUNNY_STREAM_LIBRARY_ID", "")
+BUNNY_STREAM_API_KEY = env("BUNNY_STREAM_API_KEY", "")
+BUNNY_STREAM_TOKEN_KEY = env("BUNNY_STREAM_TOKEN_KEY", "")
+BUNNY_STREAM_EMBED_TTL = int(env("BUNNY_STREAM_EMBED_TTL", 4 * 3600))  # how long a signed player link stays valid
+BUNNY_STREAM_UPLOAD_TTL = int(env("BUNNY_STREAM_UPLOAD_TTL", 6 * 3600))  # how long an instructor has to finish an upload

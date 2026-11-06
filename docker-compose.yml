@@ -20,7 +20,7 @@ services:
   web:
     build: .
     restart: unless-stopped
-    env_file: .env
+    env_file: .env   # includes BUNNY_STREAM_* keys for lesson videos (see README)
     environment:
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0

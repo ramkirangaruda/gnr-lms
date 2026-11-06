@@ -8,7 +8,7 @@ Learning platform for GNR Robotics: owners, instructors, partner schools, and in
 |---|---|
 | **Roles** | **Owner** (everything), **Instructor** (courses, quizzes, doubts, certificates, student logins), **School Admin** (sees only their own school's students and progress, can create logins for them), **Student** (in-house or school) |
 | **Logins** | Create single logins; **auto-generate** hundreds of student accounts from a count or a CSV (usernames like `dps260001`, `gnr260001` for in-house); download the credentials as CSV or print slips; students must set their own password on first login; password reset by staff |
-| **Courses** | Create, edit and delete courses; lessons with YouTube/Vimeo links **or** uploaded MP4s, notes and downloadable material; draft/publish; enrol a whole school, grade, batch, all in-house students, or a list of usernames |
+| **Courses** | Create, edit and delete courses; lessons with **Bunny Stream** uploads, YouTube/Vimeo links **or** uploaded MP4s, notes and downloadable material; draft/publish; enrol a whole school, grade, batch, all in-house students, or a list of usernames |
 | **Quizzes** | Single- and multi-answer questions with images, marks, pass %, timer with auto-submit, attempt limits, answer review after submission |
 | **Doubts** | Q&A hub: students ask from anywhere (course, lesson or general), pick a topic (code, circuit, kit…), attach photos, paste code between ``` marks, and can keep a doubt private. While typing, similar answered doubts are suggested. A **Community** tab shows classmates' answered doubts. "I have this doubt too" votes push common doubts to the top of the instructors' **Needs an answer** queue. Students can mark the best answer; replying again reopens a doubt. A badge in the nav shows the queue size / new answers. |
 | **Tracking** | Per-student report (lesson progress, quiz history, best scores, certificates, doubts), course progress table, overview of all students by school; printable |
@@ -44,7 +44,32 @@ Put HTTPS in front with Cloudflare (free) or Caddy/certbot. Until HTTPS is ready
 
 **Backups:** `docker compose exec db pg_dump -U gnr gnr_lms > backup.sql` (schedule daily with cron) and copy the `media` volume.
 
-**Videos:** prefer **unlisted YouTube or Vimeo links**. They cost nothing in bandwidth and stream smoothly to every student at once. Uploaded MP4s work too, but they use your server's bandwidth.
+**Videos:** the best option is **Bunny Stream** (below): instructors upload from the lesson form and students get adaptive streaming that only enrolled users can play. Unlisted YouTube or Vimeo links still work and cost nothing. Uploaded MP4s work too, but they use your server's bandwidth.
+
+## Lesson videos on Bunny Stream
+
+Instructors pick a video file on the lesson form; it uploads straight from their browser to Bunny (resumable, any size), so it never passes through this server and they need no Bunny login. Students watch it in the lesson page through a signed player link that expires.
+
+**One-time setup (about 10 minutes):**
+1. Create an account at [bunny.net](https://bunny.net) and add a payment method.
+2. Go to **Stream → Add Video Library**. Name it e.g. `gnr-lms` and pick the regions nearest your students.
+3. Open the library and go to **API**. Copy the **Video Library ID** and the **API Key** (the library's key, not your account key).
+4. In the library's **Security** tab:
+   - turn on **Enable token authentication** (embed view token authentication) and copy the **Token Authentication Key**;
+   - optionally add your domain (e.g. `lms.gnrrobotics.com`) under **Allowed Referrers** and turn on **Block direct URL file access**.
+5. Put the values in `.env` (never in code or git):
+   ```
+   BUNNY_STREAM_LIBRARY_ID=123456
+   BUNNY_STREAM_API_KEY=...
+   BUNNY_STREAM_TOKEN_KEY=...
+   # optional: how long a player link stays valid, in seconds (default 4 hours)
+   BUNNY_STREAM_EMBED_TTL=14400
+   ```
+6. Restart: `docker compose up -d` (the `web` service reads `.env`). Run `docker compose exec web python manage.py migrate` once after updating the code.
+
+**Using it:** open a lesson → **Edit lesson** → **Upload lesson video**, choose the file, wait for 100%, then **Save**. Bunny needs a few minutes to encode before the video plays. Uploading a new video replaces (and deletes) the old one; tick **Remove the Bunny Stream video** to go back to a YouTube link. Deleting a lesson or course also deletes its Bunny videos.
+
+Only owners and the course's own instructors can upload. If the Bunny variables are empty, the upload box simply doesn't appear and everything else works as before.
 
 ## Scaling up later (AWS)
 
