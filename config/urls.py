@@ -78,7 +78,7 @@ urlpatterns = [
 ]
 
 if settings.DEBUG or settings.STORAGES["default"]["BACKEND"].endswith("FileSystemStorage"):
-    # In production nginx serves /media/ directly; this is a fallback.
+    # In production Caddy serves /media/ directly; this is a fallback.
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 admin.site.site_header = "GNR Robotics LMS – Admin"

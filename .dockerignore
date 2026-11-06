@@ -5,3 +5,4 @@ media
 staticfiles
 .env
 frontend/node_modules
+backups

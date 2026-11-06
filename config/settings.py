@@ -18,7 +18,10 @@ DEBUG = env_bool("DJANGO_DEBUG", not env("POSTGRES_DB"))
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-insecure-change-me" if DEBUG else None)
 if not SECRET_KEY:
     raise RuntimeError("Set DJANGO_SECRET_KEY in production (.env)")
-ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "*").split(",") if h.strip()]
+# Production must list its real hostname(s); "*" is only a convenience for local DEBUG runs.
+ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "*" if DEBUG else "").split(",") if h.strip()]
+if not ALLOWED_HOSTS:
+    raise RuntimeError("Set DJANGO_ALLOWED_HOSTS in production (.env), e.g. lms.example.com")
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 
 INSTALLED_APPS = [
@@ -133,6 +136,15 @@ else:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Send errors (with tracebacks) to the container log, so `docker compose logs web` shows why a page failed.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
+    "loggers": {"django": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO"), "propagate": False}},
+}
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = env_bool("SECURE_COOKIES", True)
