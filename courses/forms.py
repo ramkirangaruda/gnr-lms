@@ -24,6 +24,11 @@ class LessonForm(StyledMixin, forms.ModelForm):
     # Filled in by the browser after it finishes uploading to Bunny Stream (see lesson_form.html).
     bunny_upload_token = forms.CharField(required=False, widget=forms.HiddenInput)
     remove_bunny_video = forms.BooleanField(required=False, label="Remove the Bunny Stream video from this lesson")
+    # For videos already uploaded in the Bunny dashboard: paste the video ID (or any Bunny link that contains it).
+    bunny_existing_id = forms.CharField(
+        required=False, max_length=300, label="Or use a video already in Bunny (video ID)",
+        help_text="In Bunny: Stream → your library → click the video → copy the Video ID "
+                  "(looks like 1a2b3c4d-…). A Bunny embed or play link works too.")
 
     class Meta:
         model = Lesson
@@ -36,6 +41,8 @@ class LessonForm(StyledMixin, forms.ModelForm):
         self.new_bunny_video_id = None
         if not self.instance.bunny_video_id:
             del self.fields["remove_bunny_video"]
+        if not bunny.is_enabled():
+            del self.fields["bunny_existing_id"]
 
     def clean_video_file(self):
         f = self.cleaned_data.get("video_file")
@@ -52,6 +59,13 @@ class LessonForm(StyledMixin, forms.ModelForm):
                 self.add_error(None, "The video upload link has expired or is invalid. Please upload the video again.")
             else:
                 self.new_bunny_video_id = video_id
+        pasted = (d.get("bunny_existing_id") or "").strip().lower()
+        if pasted and not token:
+            m = bunny.VIDEO_ID_RE_ANY.search(pasted)
+            if not m:
+                self.add_error("bunny_existing_id", "That doesn't look like a Bunny video ID (e.g. 1a2b3c4d-1234-…).")
+            elif m.group(0) != self.instance.bunny_video_id:
+                self.new_bunny_video_id = m.group(0)
         return d
 
     def save(self, commit=True):

@@ -392,6 +392,28 @@ class BunnyStreamTests(TestCase):
         self.assertTrue(self.calls[-1].full_url.endswith(VID2))
         self.assertContains(self.client.get(f"/courses/{self.course.slug}/lessons/{self.lesson.pk}/"), "youtube-nocookie.com")
 
+    def test_attach_video_already_in_bunny_by_id_or_link(self):
+        self.login("instructor1", "instructor123")
+        self.assertContains(self.client.get(f"/courses/{self.course.slug}/lessons/{self.lesson.pk}/edit/"), "bunny_existing_id")
+        r = self._save_lesson(self.lesson, bunny_existing_id="not-a-video-id")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "look like a Bunny video ID")
+        self.lesson.refresh_from_db()
+        self.assertEqual(self.lesson.bunny_video_id, "")
+        link = f"https://iframe.mediadelivery.net/embed/123456/{VID.upper()}?autoplay=false"
+        self.assertEqual(self._save_lesson(self.lesson, bunny_existing_id=link).status_code, 302)
+        self.lesson.refresh_from_db()
+        self.assertEqual(self.lesson.bunny_video_id, VID)
+        self.assertEqual(self.calls, [])  # attaching never calls Bunny or deletes anything
+        # saving again with the same ID changes nothing and deletes nothing
+        self._save_lesson(self.lesson, bunny_existing_id=VID)
+        self.assertEqual(self.calls, [])
+
+    @override_settings(BUNNY_STREAM_API_KEY="")
+    def test_paste_box_hidden_without_bunny(self):
+        self.login("instructor1", "instructor123")
+        self.assertNotContains(self.client.get(f"/courses/{self.course.slug}/lessons/{self.lesson.pk}/edit/"), "bunny_existing_id")
+
     def test_lesson_delete_removes_bunny_video(self):
         self.lesson.bunny_video_id = VID
         self.lesson.save()

@@ -22,6 +22,7 @@ API_BASE = "https://video.bunnycdn.com"
 TUS_ENDPOINT = f"{API_BASE}/tusupload"
 EMBED_BASE = "https://iframe.mediadelivery.net/embed"
 VIDEO_ID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+VIDEO_ID_RE_ANY = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 UPLOAD_TOKEN_SALT = "courses.bunny.upload"
 UPLOAD_TOKEN_MAX_AGE = 24 * 3600
 
