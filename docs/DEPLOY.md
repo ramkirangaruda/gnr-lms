@@ -3,9 +3,8 @@
 This takes you from "no server" to "instructors are using the LMS on its own web address". Plan for about 2 hours the
 first time. Every command is meant to be copied and pasted.
 
-**Before you start, decide one thing: the web address.** This guide writes it as `lms.YOUR-DOMAIN.com`. Everywhere
-you see that, type your real address instead (for example `lms.gnrrobotics.com` if you own `gnrrobotics.com`). You
-need to be able to log in to the place where that domain was bought (GoDaddy, Hostinger, Namecheap, Cloudflare, etc.).
+**Your web address is `https://lms.gnrrobo.com`.** Your domain `gnrrobo.com` is at GoDaddy, so you will add one DNS
+record there (step 5). If you ever change the address, replace it everywhere you see it below.
 
 **Rule for keys and passwords:** Bunny keys, database passwords and the secret key go **only** into the `.env` file on
 the server (step 6). Don't paste them into chat, email, WhatsApp, GitHub or a document.
@@ -32,10 +31,8 @@ clicks (step 15).
 9. Click **Create Droplet**. After about a minute it shows an **IP address** like `139.59.12.34`. Write it down. This
    guide calls it `SERVER-IP`.
 
-*Cheaper alternative:* Hetzner Cloud (<https://www.hetzner.com/cloud>) has servers with more memory for less money,
-but its nearest location is Singapore (a little slower from India) and new accounts sometimes need ID verification.
-If you pick Hetzner: location **Singapore**, image **Ubuntu 24.04**, the smallest **shared vCPU** plan with **4 GB**
-RAM, add your SSH key the same way. Everything after this step is the same.
+*Is there anything cheaper?* See "Server cost comparison" at the end. Short answer: not at the same reliability, so
+use DigitalOcean.
 
 ## Step 2. Make an SSH key on your Windows PC (5 minutes)
 
@@ -108,20 +105,22 @@ Check Docker works: `docker run --rm hello-world` should print "Hello from Docke
 
 Do this now, because it can take from a few minutes to an hour to start working.
 
-1. Log in where your domain is managed and open its **DNS** settings (sometimes called "DNS Management", "Zone editor"
-   or "Advanced DNS").
-2. **Add a record:**
+**In GoDaddy:**
+1. Go to <https://dcc.godaddy.com/domains> and sign in.
+2. Click the domain **gnrrobo.com**, then **DNS** (it may be called **Manage DNS**). You see a table of records.
+3. Click **Add New Record** (or **Add**).
+4. Fill in:
    - **Type:** `A`
-   - **Name / Host:** `lms` (only the first part, not the whole address)
+   - **Name:** `lms` (just that, not the full address)
    - **Value / Points to:** `SERVER-IP`
-   - **TTL:** 5 minutes / 300 (or "Automatic")
-3. Save.
-4. **If your DNS is on Cloudflare:** click the orange cloud next to the record so it turns **grey ("DNS only")**.
-   The server makes its own HTTPS certificate and that needs a direct connection.
+   - **TTL:** 600 seconds, or **1/2 hour** (the shortest GoDaddy allows is fine)
+5. Click **Save**.
+6. Don't touch the other records (the `@` and `www` ones belong to your main website).
+7. If GoDaddy already has an `A` or `CNAME` record named `lms`, edit or delete that one instead of adding a second.
 
 Check from PowerShell on your PC (not on the server):
 ```powershell
-nslookup lms.YOUR-DOMAIN.com
+nslookup lms.gnrrobo.com
 ```
 When the answer shows `SERVER-IP`, it's ready. Carry on with step 6 while you wait.
 
@@ -154,9 +153,9 @@ after `=` and type or paste the new one, no spaces around `=`):
 |---|---|
 | `DJANGO_SECRET_KEY=` | the first random line |
 | `DJANGO_DEBUG=0` | leave as `0` |
-| `LMS_DOMAIN=` | `lms.YOUR-DOMAIN.com` |
-| `DJANGO_ALLOWED_HOSTS=` | `lms.YOUR-DOMAIN.com` |
-| `DJANGO_CSRF_TRUSTED_ORIGINS=` | `https://lms.YOUR-DOMAIN.com` |
+| `LMS_DOMAIN=` | `lms.gnrrobo.com` |
+| `DJANGO_ALLOWED_HOSTS=` | `lms.gnrrobo.com` |
+| `DJANGO_CSRF_TRUSTED_ORIGINS=` | `https://lms.gnrrobo.com` |
 | `SECURE_COOKIES=1` | leave as `1` |
 | `WEB_CONCURRENCY=` | `3` on the 1-CPU $12 server (`5` on 2 CPUs, `9` on 4 CPUs) |
 | `POSTGRES_DB=gnr_lms`, `POSTGRES_USER=gnr` | leave as they are (the backup check script expects them) |
@@ -201,8 +200,8 @@ Watch the HTTPS certificate being made:
 ```bash
 docker compose logs caddy | grep -i -E "certificate obtained|error"
 ```
-"certificate obtained successfully" means done. Now open **https://lms.YOUR-DOMAIN.com/healthz** in your browser. It
-should show `{"status": "ok"}`. Then open **https://lms.YOUR-DOMAIN.com** and you should see the login page with a
+"certificate obtained successfully" means done. Now open **https://lms.gnrrobo.com/healthz** in your browser. It
+should show `{"status": "ok"}`. Then open **https://lms.gnrrobo.com** and you should see the login page with a
 padlock in the address bar.
 
 If something is wrong, see "When something doesn't work" at the end.
@@ -217,7 +216,7 @@ docker compose exec web python manage.py changepassword ramkiran
 The second command asks for the password twice (nothing shows while you type; that's normal). Use a strong password:
 at least 12 characters, not used anywhere else.
 
-Log in at https://lms.YOUR-DOMAIN.com with it.
+Log in at https://lms.gnrrobo.com with it.
 
 ## Step 9. Demo logins: keep them off the live server
 
@@ -242,7 +241,7 @@ password; they're asked to pick their own on first login. Send each person their
 1. **Embed View Token Authentication: ON.** Now videos only play through the signed link the LMS creates for
    logged-in, enrolled users. (Bunny's own "share" or preview links will stop working outside the dashboard. That's
    expected.)
-2. **Allowed Referrers:** add `lms.YOUR-DOMAIN.com`. Videos then refuse to play when embedded on any other site.
+2. **Allowed Referrers:** add `lms.gnrrobo.com`. Videos then refuse to play when embedded on any other site.
 3. **Block direct URL file access: ON.** Stops people downloading the raw video file by URL.
 4. Click **Save**.
 
@@ -276,7 +275,7 @@ So you get an email if the site goes down at night.
 
 1. Sign up free at <https://uptimerobot.com>.
 2. **New monitor** → type **HTTP(s)** → **Friendly name** `GNR LMS` → **URL**
-   `https://lms.YOUR-DOMAIN.com/healthz` → interval **5 minutes** → alert contact: your email (add your phone in the app
+   `https://lms.gnrrobo.com/healthz` → interval **5 minutes** → alert contact: your email (add your phone in the app
    if you like).
 3. **Create monitor.** It should go green within a few minutes.
 
@@ -382,6 +381,22 @@ Then by hand, in your browser:
 
 ---
 
+## Server cost comparison (checked 7 Nov 2026; prices change, so check the checkout page)
+
+You need about 2 GB of RAM, a disk of 40 GB or more, and a server that stays on. Price is only part of that.
+
+| Option | About | Honest trade-offs for your LMS |
+|---|---|---|
+| **DigitalOcean Bangalore, 2 GB** (recommended) | about $11 to $12 a month | India location, so pages are fast for your students. Easy panel, 2 TB of traffic, resize in two clicks. Not the very cheapest, but no surprises. |
+| Vultr Bangalore, 2 GB | about $12 a month | Same idea as DigitalOcean at the same price. A fine alternative; no reason to switch. |
+| Hetzner Cloud | EU 4 GB: about EUR 5.5 a month. Singapore 4 GB: about EUR 19.5 | Hetzner raised prices sharply in April and June 2026. The cheap plans are in Europe only and were often out of stock when checked in autumn 2026; Singapore is now expensive. Europe works for an instructors-only start (video comes from Bunny, so only page loads are slower, about 130 to 160 ms), but you may not be able to order the cheap plan. Not worth the hassle to save about $5 a month. |
+| Oracle Cloud "Always Free" | $0 | Free, but not reliable enough for a school business. New ARM servers are often "out of capacity", Oracle reduced the free allowance in 2026, it can stop or reclaim servers it thinks are idle, and sign-up often fails with Indian cards. The LMS would run on it (all its parts have ARM versions), but a surprise shutdown on a class day would cost more than $12. Fine for practising, not for live use. |
+| Contabo | cheap for 4+ GB | Looks cheap on paper, but it is known for crowded servers, slow disks and slow support, and I haven't verified the current price or an India location. Not recommended for something your students depend on. |
+| Anything under 2 GB (for example a $4 to $6 server) | $4 to $6 | The Docker build and the database need more memory than that. It would crash. Don't. |
+
+**Recommendation:** DigitalOcean Bangalore 2 GB. It is about $11 to $12 a month, which is roughly $140 a year. Pay monthly, not yearly, so you can resize or stop.
+Your only other costs are Bunny and the domain you already own.
+
 ## Updating the LMS later
 
 When there's new code on GitHub (for example after merging a pull request):
@@ -391,7 +406,7 @@ sh deploy/backup.sh
 git pull
 docker compose up -d --build
 ```
-Database changes apply by themselves on start. Check https://lms.YOUR-DOMAIN.com/healthz afterwards.
+Database changes apply by themselves on start. Check https://lms.gnrrobo.com/healthz afterwards.
 
 ## When something doesn't work
 

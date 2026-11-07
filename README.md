@@ -32,7 +32,7 @@ Run the tests: `python manage.py test`
 
 A VPS with **2 vCPU / 4 GB RAM** (e.g. AWS Lightsail, DigitalOcean or Hetzner, roughly $12–24/month) is enough.
 
-1. Point a DNS **A record** for your subdomain (e.g. `lms` → `lms.gnrrobotics.com`) at the server's IP address.
+1. Point a DNS **A record** for your subdomain (e.g. `lms` → `lms.gnrrobo.com`) at the server's IP address.
 2. On the server (Ubuntu 24.04, with Docker installed: `curl -fsSL https://get.docker.com | sh`):
 
 ```bash
@@ -87,7 +87,7 @@ Instructors pick a video file on the lesson form; it uploads straight from their
 3. Open the library and go to **API**. Copy the **Video Library ID** and the **API Key** (the library's key, not your account key).
 4. In the library's **Security** tab:
    - turn on **Enable token authentication** (embed view token authentication) and copy the **Token Authentication Key**;
-   - optionally add your domain (e.g. `lms.gnrrobotics.com`) under **Allowed Referrers** and turn on **Block direct URL file access**.
+   - optionally add your domain (e.g. `lms.gnrrobo.com`) under **Allowed Referrers** and turn on **Block direct URL file access**.
 5. Put the values in `.env` (never in code or git):
    ```
    BUNNY_STREAM_LIBRARY_ID=123456
@@ -129,7 +129,7 @@ EMAIL_PORT=587
 EMAIL_HOST_USER=...
 EMAIL_HOST_PASSWORD=...
 EMAIL_USE_TLS=1
-DEFAULT_FROM_EMAIL=GNR Robotics LMS <no-reply@gnrrobotics.com>
+DEFAULT_FROM_EMAIL=GNR Robotics LMS <no-reply@gnrrobo.com>
 ```
 
 Cheap options (password resets are a handful of emails a day):
