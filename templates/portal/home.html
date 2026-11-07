@@ -1,11 +1,10 @@
-{% extends "base.html" %}{% block title %}Home{% endblock %}{% block main_class %}{% endblock %}{% block msg_class %}container pt-3{% endblock %}
+{% extends "base.html" %}{% load static %}{% block title %}Home{% endblock %}{% block main_class %}{% endblock %}{% block msg_class %}container pt-3{% endblock %}
 {% block content %}
 <section class="hero-dark">
  <div class="rb-bg" data-rb="threads"></div>
  <div class="container hero-inner py-5">
   <div class="row align-items-center py-lg-5" style="min-height:min(78vh,720px)">
    <div class="col-lg-8">
-    <div class="pill mb-4 reveal"><span class="dot"></span><span data-rb="shiny" data-color="#bdbdbd">Robotics learning platform</span></div>
     <h1 class="hero-title mb-4 reveal" style="--i:1">Learn robotics.<br><span data-rb="gradient">Build the future.</span></h1>
     <p class="lead mb-4 reveal" style="--i:2;max-width:620px">Video lessons, quizzes, doubt clarification and certificates for GNR in-house students and our partner schools, all in one place.</p>
     <div class="d-flex flex-wrap gap-2 mb-5 reveal" style="--i:3">
@@ -17,6 +16,7 @@
      {% for label, n in stats.items %}<div><div class="n"><span data-rb="counter" data-value="{{ n }}">{{ n }}</span>+</div><div class="l">{{ label }}</div></div>{% endfor %}
     </div>
    </div>
+   <div class="col-lg-4 d-none d-lg-flex justify-content-center reveal" style="--i:2"><img src="{% static 'img/gnr-logo.png' %}" class="hero-logo" width="320" height="320" alt="GNR Robotics: Learn, Build, Innovate"></div>
   </div>
  </div>
 </section>
@@ -28,7 +28,7 @@
  <div class="row g-4">
   <div class="col-lg-8">
    <div class="d-flex justify-content-between align-items-center"><h4 class="section-title">From the lab</h4><a href="{% url 'gallery' %}" class="small fw-semibold">View gallery <i class="bi bi-arrow-right"></i></a></div>
-   <div class="row g-2">{% for g in gallery %}<div class="col-6 col-md-3"><img src="{{ g.image.url }}" class="gallery-img" alt="{{ g.title }}" loading="lazy"></div>{% empty %}<div class="col-12"><div class="card card-dark p-5 text-center"><i class="bi bi-camera fs-1" style="color:var(--red)"></i><p class="mt-2 mb-0 text-muted">Photos from our workshops and competitions coming soon.</p></div></div>{% endfor %}</div>
+   <div class="row g-2">{% for g in gallery %}<div class="col-6 col-md-3"><img src="{{ g.image.url }}" class="gallery-img" alt="{{ g.title }}" loading="lazy"></div>{% empty %}<div class="col-12"><div class="card card-dark p-5 text-center"><i class="bi bi-camera fs-1" style="color:var(--red-on-dark)"></i><p class="mt-2 mb-0 text-muted">Photos from our workshops and competitions coming soon.</p></div></div>{% endfor %}</div>
   </div>
   <div class="col-lg-4">{% include "portal/_side.html" %}</div>
  </div>
