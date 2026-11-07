@@ -3,7 +3,7 @@
 <div class="page-banner mb-4 reveal">
  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
   <div><div class="eyebrow mb-1">Doubt clarification</div>
-   <h2 class="mb-1">{% if user.is_student %}Stuck? <span style="color:#ff5a4f">Ask away.</span>{% else %}Help students get unstuck{% endif %}</h2>
+   <h2 class="mb-1">{% if user.is_student %}Stuck? <span style="color:var(--red-on-dark)">Ask away.</span>{% else %}Help students get unstuck{% endif %}</h2>
    <p class="text-muted mb-0">{% if user.is_student %}Ask about any lesson, your code, circuit or kit. Browse the community tab to learn from classmates' answered doubts.{% else %}Doubts with the most “me too” votes are shown first in the queue.{% endif %}</p></div>
   {% if user.is_student %}<a class="btn btn-primary btn-lg btn-glow" href="{% url 'doubt_ask' %}"><i class="bi bi-plus-lg"></i> Ask a doubt</a>{% endif %}
  </div>

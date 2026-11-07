@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}Log in{% endblock %}{% block main_class %}{% endblock %}
+{% extends "base.html" %}{% load static %}{% block title %}Log in{% endblock %}{% block main_class %}{% endblock %}
 {% block content %}
 <div class="auth-wrap">
  <div class="auth-side hero-dark d-flex align-items-end">
@@ -11,6 +11,7 @@
  </div>
  <div class="auth-form">
   <div class="inner reveal">
+   <img src="{% static 'img/gnr-logo-128.png' %}" class="auth-logo" width="72" height="72" alt="GNR Robotics">
    <div class="eyebrow mb-2">Welcome back</div>
    <h2 class="mb-4">Log in to your account</h2>
    <form method="post">{% csrf_token %}

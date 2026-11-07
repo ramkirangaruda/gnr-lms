@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
+from django.http import HttpResponsePermanentRedirect
+from django.templatetags.static import static
 from django.urls import path, re_path
 
 from accounts import views as a
@@ -16,6 +18,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", p.home, name="home"),
     path("healthz", healthz, name="healthz"),
+    # Browsers ask for /favicon.ico on their own (e.g. for PDFs and bookmarks); send them the GNR logo icon.
+    path("favicon.ico", lambda request: HttpResponsePermanentRedirect(static("img/favicon.ico"))),
     path("dashboard/", p.dashboard, name="dashboard"),
 
     # auth
