@@ -52,9 +52,11 @@ def home(request):
             ("bi-chat-dots", "Doubt clarification", "Stuck on a circuit or code? Ask with a photo and get answers from instructors."),
             ("bi-award", "Certificates", "Earn verifiable certificates for every course and competition."),
         ],
-        "stats": {"students": User.objects.filter(role=User.Role.STUDENT).count(),
-                  "schools": School.objects.filter(is_active=True).count(),
-                  "courses": Course.objects.filter(is_published=True).count()},
+        # Fixed marketing figures (the template adds the "+": 1000+ / 10+ / 12+),
+        # not live database counts.
+        "stats": {"students": 1000,
+                  "schools": 10,
+                  "courses": 12},
     })
 
 
